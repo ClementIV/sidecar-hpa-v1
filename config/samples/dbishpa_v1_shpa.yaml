@@ -1,0 +1,7 @@
+apiVersion: dbishpa.my.shpa/v1alpha1
+kind: SHPA
+metadata:
+  name: shpa-sample
+spec:
+  # Add fields here
+  foo: bar

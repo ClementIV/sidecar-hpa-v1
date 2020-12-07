@@ -1,0 +1,7 @@
+domain: my.shpa
+repo: sidecar-hpa
+resources:
+- group: dbishpa
+  kind: SHPA
+  version: v1
+version: "2"
