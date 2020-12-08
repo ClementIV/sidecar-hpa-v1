@@ -18,6 +18,9 @@ package controllers
 
 import (
 	"context"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +30,15 @@ import (
 	dbishpav1 "sidecar-hpa/api/v1"
 )
 
+const (
+	defaultSyncPeriod = 15 * time.Second
+	subsystem = "shpa_controller"
+)
+
+var (
+	log                                                                = logf.Log.WithName(subsystem)
+	dryRunCondition autoscalingv2.HorizontalPodAutoscalerConditionType = "DryRun"
+)
 // SHPAReconciler reconciles a SHPA object
 type SHPAReconciler struct {
 	client.Client
