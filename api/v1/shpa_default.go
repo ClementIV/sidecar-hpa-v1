@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 package v1
 
 import "fmt"
@@ -36,7 +35,7 @@ func DefaultSHPA(shpa *SHPA) *SHPA {
 	if shpa.Spec.MinReplicas == 0 {
 		defaultSHPA.Spec.MinReplicas = defaultMinReplicas
 	}
-	if shpa.Spec.Algorithm == ""{
+	if shpa.Spec.Algorithm == "" {
 		defaultSHPA.Spec.Algorithm = defaultAlgorithm
 	}
 	if shpa.Spec.Tolerance == 0 {
@@ -85,7 +84,6 @@ func IsDefaultSHPA(spa *SHPA) bool {
 	return true
 }
 
-
 // CheckSHPAValidity use to check the validty of a SHPA
 // return nil if valid, else an error
 func CheckSHPAValidity(shpa *SHPA) error {
@@ -114,6 +112,7 @@ func checkSPAMetricsValidity(shpa *SHPA) (err error) {
 				msg := fmt.Sprintf("Watermarks are not set correctly, removing the WPA %s/%s from the Reconciler", shpa.Namespace, shpa.Name)
 				return fmt.Errorf(msg)
 			}
+
 			if metric.External.MetricSelector == nil {
 				msg := fmt.Sprintf("Missing Labels for the External metric %s", metric.External.MetricName)
 				return fmt.Errorf(msg)
@@ -144,5 +143,3 @@ func checkSPAMetricsValidity(shpa *SHPA) (err error) {
 	}
 	return err
 }
-
-

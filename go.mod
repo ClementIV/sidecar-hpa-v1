@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/prometheus/common v0.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.4.0 // indirect
+	github.com/stretchr/testify v1.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v12.0.0+incompatible
@@ -23,7 +23,7 @@ require (
 	k8s.io/kube-aggregator v0.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20190918143330-0270cf2f1c1d // indirect
 	k8s.io/kubernetes v1.16.2
-	k8s.io/metrics v0.0.0 // indirect
+	k8s.io/metrics v0.0.0
 	sigs.k8s.io/controller-runtime v0.4.0
 )
 

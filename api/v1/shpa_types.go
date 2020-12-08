@@ -26,8 +26,6 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -125,6 +123,7 @@ type CrossVersionObjectReference struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 }
+
 // SHPAList contains a list of SHPA
 type SHPAList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -210,7 +209,6 @@ type MetricSpec struct {
 	// +optional
 	Resource *ResourceMetricSource `json:"resource,omitempty"`
 }
-
 
 func init() {
 	SchemeBuilder.Register(&SHPA{}, &SHPAList{})

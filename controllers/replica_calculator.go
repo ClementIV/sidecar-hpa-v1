@@ -178,7 +178,6 @@ func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas i
 		return currentReplicas, utilizationQuantity.MilliValue()
 	}
 
-
 	return replicaCount, utilizationQuantity.MilliValue()
 }
 
@@ -300,8 +299,3 @@ func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodCondition
 	}
 	return -1, nil
 }
-
-
-
-
-

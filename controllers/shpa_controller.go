@@ -32,13 +32,14 @@ import (
 
 const (
 	defaultSyncPeriod = 15 * time.Second
-	subsystem = "shpa_controller"
+	subsystem         = "shpa_controller"
 )
 
 var (
 	log                                                                = logf.Log.WithName(subsystem)
 	dryRunCondition autoscalingv2.HorizontalPodAutoscalerConditionType = "DryRun"
 )
+
 // SHPAReconciler reconciles a SHPA object
 type SHPAReconciler struct {
 	client.Client
