@@ -19,13 +19,16 @@ package controllers
 import (
 	"context"
 	"fmt"
+	datadoghqv1alpha1 "github.com/DataDog/watermarkpodautoscaler/pkg/apis/datadoghq/v1alpha1"
 	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/external_metrics"
+	"math"
 	dbishpav1 "sidecar-hpa/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -278,45 +282,49 @@ func (r *SHPAReconciler) reconcileSHPA(logger logr.Logger, shpa *dbishpav1.SHPA)
 	}
 	currentReplicas := currentScale.Status.Replicas
 	logger.Info("Target deploy", "replicas", currentReplicas)
-	wpaStatusOriginal := shpa.Status.DeepCopy()
+	shpaStatusOriginal := shpa.Status.DeepCopy()
 
 	reference := fmt.Sprintf("%s/%s/%s",shpa.Spec.ScaleTargetRef.Kind, shpa.Namespace, shpa.Spec.ScaleTargetRef.Name)
 	setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionTrue, "SucceededGetScale", "the SHPA controller was able to get the target's current scale")
+	metricStatuses := shpaStatusOriginal.CurrentMetrics
+	if metricStatuses == nil {
+		metricStatuses = []autoscalingv2.MetricStatus{}
+	}
+	rescale,desiredReplicas,rescaleReason,err:=r.computeReplicas(logger,currentReplicas,currentScale,shpa,metricStatuses,shpaStatusOriginal,reference)
 
-	proposeReplicas := int32(0)
-	desiredReplicas := int32(0)
-	rescaleReason := ""
-	now := time.Now()
+	if err!=nil {
+		r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
+		logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
+		return nil
+	}
 
-	rescale := true
-	switch {
-	case currentScale.Spec.Replicas == 0:
-		// Autoscaling is disabled for this resource
-		desiredReplicas = 0
-		rescale = false
-		setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "ScalingDisabled","scaling is disabled since the replica count of the target is zero")
-	case currentReplicas > shpa.Spec.MaxReplicas:
-		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
-		desiredReplicas = shpa.Spec.MaxReplicas
-	case currentReplicas < shpa.Spec.MinReplicas:
-		rescaleReason = "Current number of replicas below Spec.MinReplicas"
-		desiredReplicas = shpa.Spec.MinReplicas
-	case currentReplicas ==0:
-		rescaleReason = "Current number of replicas must be greater than 0"
-		desiredReplicas = 1
-	default:
-		var metricTimestamp time.Time
-		proposeReplicas,me
+	if rescale{
+
+	}
+
+}
+
+func (r *SHPAReconciler) rescaleReplicas(shpa *dbishpav1.SHPA,currentReplicas ,desiredReplicas int32,rescaleReason string,targetGR schema.GroupResource){
+	setCondition(shpa,autoscalingv2.AbleToScale,corev1.ConditionTrue,"ReadyForScale", "the last scaling time was sufficiently old as to warrant a new scale")
+	if shpa.Spec.DryRun{
+
 	}
 }
 // computeReplicas check max and min and set default algorithm
-func (r *SHPAReconciler) computeReplicas(currentReplicas int32,currentScale *autoscalingv1.Scale,shpa *dbishpav1.SHPA){
+func (r *SHPAReconciler) computeReplicas(
+	logger logr.Logger,
+	currentReplicas int32,
+	currentScale *autoscalingv1.Scale,
+	shpa *dbishpav1.SHPA,
+	metricStatuses []autoscalingv2.MetricStatus ,
+	shpaStatusOriginal *dbishpav1.SHPAStatus,
+	reference string,
+)(bool,int32,string,error){
 	proposeReplicas := int32(0)
-	metricName := ""
 	desiredReplicas := int32(0)
 	rescaleReason := ""
 	now := time.Now()
-
+	var err error
 	rescale := true
 	switch {
 	case currentScale.Spec.Replicas == 0:
@@ -335,7 +343,99 @@ func (r *SHPAReconciler) computeReplicas(currentReplicas int32,currentScale *aut
 		desiredReplicas = 1
 	default:
 		var metricTimestamp time.Time
-		proposeReplicas,metricName, metricStatuses,me
+		proposeReplicas,metricStatuses,metricTimestamp,err = r.computeReplicasForMetrics(logger,shpa,currentScale)
+		if err2 := r.updateStatusIfNeeded(shpaStatusOriginal,shpa);err2 !=nil {
+			r.eventRecorder.Event(shpa,corev1.EventTypeWarning,"FailedUpdateReplicas",err.Error())
+			setCondition(shpa, autoscalingv2.AbleToScale,corev1.ConditionFalse, "FailedUpdateReplicas","the WPA controller was unable to update the number of replicas: %v",err)
+			logger.Info("The SHPA controller was unable to update the number of replicas", "error", err2)
+			return false,desiredReplicas,"",nil
+		}
+		r.eventRecorder.Event(shpa, corev1.EventTypeWarning,"FailedComputeMetricsReplicas",err.Error())
+		logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference",reference ,"error",err)
+
+		if proposeReplicas > desiredReplicas {
+			desiredReplicas = proposeReplicas
+			now = metricTimestamp
+		}
+		if desiredReplicas > currentReplicas {
+			rescaleReason = fmt.Sprintf(" above target")
+		}
+		if desiredReplicas < currentReplicas {
+			rescaleReason = "All metrics below target"
+		}
+		desiredReplicas = normalizeDesiredReplicas(logger,shpa,currentReplicas,desiredReplicas)
+		logger.Info("Normalized Desired replicas", "desiredReplicas", desiredReplicas)
+
+		rescale = shouldScale(logger,shpa,currentReplicas,desiredReplicas,now)
+
+	}
+	return rescale,desiredReplicas,rescaleReason,nil
+}
+
+
+func shouldScale(logger logr.Logger, shpa *dbishpav1.SHPA, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
+	if shpa.Status.LastScaleTime == nil {
+		logger.Info("No timestamp for the lastScale event")
+		return true
+	}
+
+	backoffDown := false
+	backoffUp := false
+	downscaleForbiddenWindow := time.Duration(shpa.Spec.DownscaleForbiddenWindowSeconds) * time.Second
+	downscaleCountdown := shpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Sub(timestamp).Seconds()
+
+	if downscaleCountdown > 0 {
+		setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "BackoffDownscale", "the time since the previous scale is still within the downscale forbidden window")
+		backoffDown = true
+		logger.Info("Too early to downscale", "lastScaleTime", shpa.Status.LastScaleTime, "nextDownscaleTimestamp", metav1.Time{Time: shpa.Status.LastScaleTime.Add(downscaleForbiddenWindow)}, "lastMetricsTimestamp", metav1.Time{Time: timestamp})
+	}
+	upscaleForbiddenWindow := time.Duration(shpa.Spec.UpscaleForbiddenWindowSeconds) * time.Second
+	upscaleCountdown := shpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Sub(timestamp).Seconds()
+
+	// Only upscale if there was no rescaling in the last upscaleForbiddenWindow
+	if upscaleCountdown > 0 {
+		backoffUp = true
+		logger.Info("Too early to upscale", "lastScaleTime", shpa.Status.LastScaleTime, "nextUpscaleTimestamp", metav1.Time{Time: shpa.Status.LastScaleTime.Add(upscaleForbiddenWindow)}, "lastMetricsTimestamp", metav1.Time{Time: timestamp})
+
+		if backoffDown {
+			setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "BackoffBoth", "the time since the previous scale is still within both the downscale and upscale forbidden windows")
+		} else {
+			setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "BackoffUpscale", "the time since the previous scale is still within the upscale forbidden window")
+		}
+	}
+
+	return canScale(logger, backoffUp, backoffDown, currentReplicas, desiredReplicas)
+}
+
+// canScale ensures that we only scale under the right conditions.
+func canScale(logger logr.Logger, backoffUp, backoffDown bool, currentReplicas, desiredReplicas int32) bool {
+	if desiredReplicas == currentReplicas {
+		logger.Info("Will not scale: number of replicas has not changed")
+		return false
+	}
+	logger.Info("Cooldown status", "backoffUp", backoffUp, "backoffDown", backoffDown, "desiredReplicas", desiredReplicas, "currentReplicas", currentReplicas)
+	return !backoffUp && desiredReplicas > currentReplicas || !backoffDown && desiredReplicas < currentReplicas
+}
+
+// setCurrentReplicasInStatus sets the current replica count in the status of the HPA.
+func (r *SHPAReconciler) setCurrentReplicasInStatus(shpa *dbishpav1.SHPA, currentReplicas int32) {
+	setStatus(shpa, currentReplicas, shpa.Status.DesiredReplicas, shpa.Status.CurrentMetrics, false)
+}
+
+// setStatus recreates the status of the given WPA, updating the current and
+// desired replicas, as well as the metric statuses
+func setStatus(shpa *dbishpav1.SHPA, currentReplicas, desiredReplicas int32, metricStatuses []autoscalingv2.MetricStatus, rescale bool) {
+	shpa.Status = dbishpav1.SHPAStatus{
+		CurrentReplicas: currentReplicas,
+		DesiredReplicas: desiredReplicas,
+		CurrentMetrics:  metricStatuses,
+		LastScaleTime:   shpa.Status.LastScaleTime,
+		Conditions:      shpa.Status.Conditions,
+	}
+
+	if rescale {
+		now := metav1.NewTime(time.Now())
+		shpa.Status.LastScaleTime = &now
 	}
 }
 
@@ -345,21 +445,20 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 	scale *autoscalingv1.Scale,
 ) (replicas int32,statuses []autoscalingv2.MetricStatus, timestamp time.Time,err error){
 	statuses = make([]autoscalingv2.MetricStatus, len(shpa.Spec.Metrics))
-
-	minReplicas := float64(shpa.Spec.MinReplicas)
+	metric :=""
 
 	for i, metricSpec := range shpa.Spec.Metrics {
 		if metricSpec.External == nil && metricSpec.Resource==nil {
 			continue
 		}
-
-
+		var replicaCountProposal int32
+		var utilizationProposal int64
 		var timestampProposal time.Time
-		//var metricNameProposal string
+		var metricNameProposal string
 		switch metricSpec.Type {
 		case dbishpav1.ExternalMetricSourceType:
 			if metricSpec.External.HighWatermark !=nil && metricSpec.External.LowWatermark != nil{
-				//metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
+				metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
 
 				replicaCalculation, errMetricsServer := r.replicaCalc.GetExternalMetricReplicas(logger, scale,metricSpec, shpa)
 
@@ -368,16 +467,70 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 					setCondition(shpa,autoscalingv2.ScalingActive,corev1.ConditionFalse,"FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v",errMetricsServer)
 					return 0,nil,time.Time{},fmt.Errorf("failed to get external metric %s: %v", metricSpec.External.MetricName, errMetricsServer)
 				}
+				replicaCountProposal = replicaCalculation.replicaCount
+				timestampProposal = replicaCalculation.timestamp
+				utilizationProposal = replicaCalculation.utilization
+
+				statuses[i] = autoscalingv2.MetricStatus{
+					Type: autoscalingv2.ExternalMetricSourceType,
+					External:&autoscalingv2.ExternalMetricStatus{
+						MetricSelector: metricSpec.External.MetricSelector,
+						MetricName: metricSpec.External.MetricName,
+						CurrentValue: *resource.NewMilliQuantity(utilizationProposal,resource.DecimalSI),
+					},
+				}
+
+			} else {
+				errMsg := "invalid external metric source: the high watermark and the low watermark are required"
+				r.eventRecorder.Event(shpa,corev1.EventTypeWarning,"FailedGetExternalMetric",errMsg)
+				setCondition(shpa,autoscalingv2.ScalingActive,corev1.ConditionFalse, "FailedGetExternalMetrics", "the SHPA was unable to compute the replica count: %v",err)
+				return 0,nil,time.Time{},fmt.Errorf(errMsg)
+			}
+		case dbishpav1.ResourceMetricSourceType:
+			if metricSpec.Resource.HighWatermark !=nil && metricSpec.Resource.LowWatermark != nil {
+				metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.Resource.Name, metricSpec.Resource.MetricSelector.MatchLabels)
+
+				replicaCalculation,errMetricsServer := r.replicaCalc.GetResourceReplicas(logger,scale,metricSpec,shpa)
+				if errMetricsServer != nil {
+					r.eventRecorder.Event(shpa,corev1.EventTypeWarning,"FailedGetResourceMetric",errMetricsServer.Error())
+					setCondition(shpa,autoscalingv2.ScalingActive, corev1.ConditionFalse,"FailedGetResourceMetric","the SHPA was unable to compute the replica count: %v", errMetricsServer)
+					return 0,nil,time.Time{},fmt.Errorf("failed to get resource metric %s: %v", metricSpec.Resource.Name, errMetricsServer)
+				}
+
+				replicaCountProposal = replicaCalculation.replicaCount
+				utilizationProposal = replicaCalculation.utilization
 				timestampProposal = replicaCalculation.timestamp
 
-
-
+				statuses[i] = autoscalingv2.MetricStatus{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricStatus{
+						Name: metricSpec.Resource.Name,
+						CurrentAverageValue: *resource.NewMilliQuantity(utilizationProposal,resource.DecimalSI),
+					},
+				}
+			} else {
+				errMsg := "invalid resource metric source: the high watermark and the low watermark are required"
+				r.eventRecorder.Event(shpa,corev1.EventTypeWarning,"FailedGetResourceMetric",errMsg)
+				setCondition(shpa,autoscalingv2.ScalingActive,corev1.ConditionFalse,"FailedGetResourceMetric","thee SHPA was unable to compute the replica count:%v",err)
+				return 0,nil,time.Time{},fmt.Errorf(errMsg)
 			}
+		default:
+			return 0,nil,time.Time{},fmt.Errorf("metricSpec.Type:%s not supported", metricSpec.Type)
+		}
+
+		// replicas will end up being the max of the replicaCountProposal if there are several metrics
+		if replicas ==0 || replicaCountProposal>replicas {
+			timestamp = timestampProposal
+			replicas = replicaCountProposal
+			metric = metricNameProposal
 		}
 
 	}
+	setCondition(shpa,autoscalingv2.ScalingActive,corev1.ConditionTrue,"ValidMetricFound","the HPA was able to successfully calculate a replica count from %s",metric)
 
+	return replicas,statuses,timestamp,nil
 }
+
 // getScaleForResourceMappings attempts to fetch the scale for the
 // resource with the given name and namespace, trying each RESTMapping
 // in turn until a working on is found. If none work, the first error
@@ -411,6 +564,78 @@ func (r *SHPAReconciler) updateStatusIfNeeded(shpaStatus *dbishpav1.SHPAStatus, 
 		return nil
 	}
 	return r.updateSHPA(shpa)
+}
+
+// Stolen from upstream
+
+// normalizeDesiredReplicas takes the metrics desired replicas value and normalizes it based on the appropriate conditions (i.e. < maxReplicas, >
+// minReplicas, etc...)
+func normalizeDesiredReplicas(logger logr.Logger, shpa *dbishpav1.SHPA, currentReplicas int32, prenormalizedDesiredReplicas int32) int32 {
+	var minReplicas int32
+
+	minReplicas = shpa.Spec.MinReplicas
+	desiredReplicas, condition, reason := convertDesiredReplicasWithRules(logger, shpa, currentReplicas, prenormalizedDesiredReplicas, minReplicas, shpa.Spec.MaxReplicas)
+
+	if desiredReplicas == prenormalizedDesiredReplicas {
+		setCondition(shpa, autoscalingv2.ScalingLimited, corev1.ConditionFalse, condition, reason)
+	} else {
+		setCondition(shpa, autoscalingv2.ScalingLimited, corev1.ConditionTrue, condition, reason)
+	}
+
+	return desiredReplicas
+}
+
+// convertDesiredReplicas performs the actual normalization, without depending on the `SHPA`
+func convertDesiredReplicasWithRules(logger logr.Logger, shpa *dbishpav1.SHPA, currentReplicas, desiredReplicas, wpaMinReplicas, wpaMaxReplicas int32) (int32, string, string) {
+
+	var minimumAllowedReplicas int32
+	var maximumAllowedReplicas int32
+	var possibleLimitingCondition string
+	var possibleLimitingReason string
+
+	scaleDownLimit := calculateScaleDownLimit(shpa, currentReplicas)
+	// Compute the maximum and minimum number of replicas we can have
+	switch {
+	case wpaMinReplicas == 0:
+		minimumAllowedReplicas = 1
+	case desiredReplicas < scaleDownLimit:
+		minimumAllowedReplicas = int32(math.Max(float64(scaleDownLimit), float64(wpaMinReplicas)))
+		possibleLimitingCondition = "ScaleDownLimit"
+		possibleLimitingReason = "the desired replica count is decreasing faster than the maximum scale rate"
+		logger.Info("Downscaling rate higher than limit of `scaleDownLimitFactor`, capping the maximum downscale to 'minimumAllowedReplicas'", "scaleDownLimitFactor", fmt.Sprintf("%.1f%%", shpa.Spec.ScaleDownLimitFactor), "wpaMinReplicas", wpaMinReplicas, "minimumAllowedReplicas", minimumAllowedReplicas)
+	case desiredReplicas >= scaleDownLimit:
+		minimumAllowedReplicas = wpaMinReplicas
+		possibleLimitingCondition = "TooFewReplicas"
+		possibleLimitingReason = "the desired replica count is below the minimum replica count"
+	}
+
+	if desiredReplicas < minimumAllowedReplicas {
+		return minimumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
+	}
+
+	scaleUpLimit := calculateScaleUpLimit(shpa, currentReplicas)
+
+	if desiredReplicas > scaleUpLimit {
+		maximumAllowedReplicas = int32(math.Min(float64(scaleUpLimit), float64(wpaMaxReplicas)))
+		logger.Info("Upscaling rate higher than limit of 'ScaleUpLimitFactor' up to 'maximumAllowedReplicas' replicas. Capping the maximum upscale to %d replicas", "scaleUpLimitFactor", fmt.Sprintf("%.1f%%", shpa.Spec.ScaleUpLimitFactor), "wpaMaxReplicas", wpaMaxReplicas, "maximumAllowedReplicas", maximumAllowedReplicas)
+		possibleLimitingCondition = "ScaleUpLimit"
+		possibleLimitingReason = "the desired replica count is increasing faster than the maximum scale rate"
+	} else {
+		maximumAllowedReplicas = wpaMaxReplicas
+		possibleLimitingCondition = "TooManyReplicas"
+		possibleLimitingReason = "the desired replica count is above the maximum replica count"
+	}
+
+	// make sure the desiredReplicas is between the allowed boundaries.
+	if desiredReplicas > maximumAllowedReplicas {
+		logger.Info("Returning replicas, condition and reason", "replicas", maximumAllowedReplicas, "condition", possibleLimitingCondition, possibleLimitingReason)
+		return maximumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
+	}
+
+	possibleLimitingCondition = "DesiredWithinRange"
+	possibleLimitingReason = "the desired count is within the acceptable range"
+
+	return desiredReplicas, possibleLimitingCondition, possibleLimitingReason
 }
 
 func (r *SHPAReconciler) updateSHPA(shpa *dbishpav1.SHPA) error {
@@ -468,4 +693,14 @@ func (r *SHPAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dbishpav1.SHPA{}).
 		Complete(r)
+}
+// Scaleup limit is used to maximize the upscaling rate.
+func calculateScaleUpLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
+	// returns TO how much we can upscale, not BY how much.
+	return int32(float64(currentReplicas) + math.Max(1, math.Floor(shpa.Spec.ScaleUpLimitFactor/100*float64(currentReplicas))))
+}
+
+// Scaledown limit is used to maximize the downscaling rate.
+func calculateScaleDownLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
+	return int32(float64(currentReplicas) - math.Max(1, math.Floor(shpa.Spec.ScaleDownLimitFactor/100*float64(currentReplicas))))
 }
