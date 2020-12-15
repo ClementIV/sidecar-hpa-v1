@@ -1,11 +1,20 @@
 
 ---
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
   name: manager-role
 rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployment
+  verbs:
+  - get
+  - list
+  - patch
+  - update
 - apiGroups:
   - dbishpa.my.shpa
   resources:

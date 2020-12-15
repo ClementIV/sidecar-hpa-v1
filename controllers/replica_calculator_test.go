@@ -302,7 +302,7 @@ func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -346,7 +346,7 @@ func TestReplicaCalcAbsoluteScaleUp(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -377,7 +377,7 @@ func TestReplicaCalcAbsoluteScaleDown(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -408,7 +408,7 @@ func TestReplicaCalcAbsoluteScaleDownLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -442,7 +442,7 @@ func TestReplicaCalcAbsoluteScaleUpPendingLessScale(t *testing.T) {
 				// There are 2 Running replicas.
 				// The resulting amount of replicas is 2 * 120 / 40 -> 6
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -474,7 +474,7 @@ func TestReplicaCalcAbsoluteScaleUpPendingLessScaleExtraReplica(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -506,7 +506,7 @@ func TestReplicaCalcAbsoluteScaleUpPendingNoScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -538,7 +538,7 @@ func TestReplicaCalcAbsoluteScaleUpPendingNoScaleStretchTolerance(t *testing.T) 
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -570,7 +570,7 @@ func TestReplicaCalcAbsoluteScaleUpFailedLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -602,7 +602,7 @@ func TestReplicaCalcAbsoluteScaleUpUnreadyLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm:             "absolute",
-				Tolerance:             0.2,
+				Tolerance:             20,
 				Metrics:               []v1.MetricSpec{metric1},
 				ReadinessDelaySeconds: readinessDelay,
 			},
@@ -648,7 +648,7 @@ func TestReplicaCalcAverageScaleUp(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -679,7 +679,7 @@ func TestReplicaCalcAverageScaleDown(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -710,7 +710,7 @@ func TestReplicaCalcAverageScaleDownLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -741,7 +741,7 @@ func TestReplicaCalcAverageScaleUpPendingLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -773,7 +773,7 @@ func TestReplicaCalcAverageScaleUpPendingNoScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -805,7 +805,7 @@ func TestReplicaCalcAverageScaleUpPendingNoScaleStretchTolerance(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -837,7 +837,7 @@ func TestReplicaCalcAverageScaleUpFailedLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -870,7 +870,7 @@ func TestReplicaCalcAverageScaleUpUnreadyLessScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm:             "average",
-				Tolerance:             0.2,
+				Tolerance:             20,
 				Metrics:               []v1.MetricSpec{metric1},
 				ReadinessDelaySeconds: readinessDelay,
 			},
@@ -923,7 +923,7 @@ func TestReplicaCalcAboveAbsoluteExternal_Upscale1(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -954,7 +954,7 @@ func TestReplicaCalcAboveAbsoluteExternal_Upscale2(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -986,7 +986,7 @@ func TestReplicaCalcAboveAbsoluteExternal_Upscale3(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -1018,7 +1018,7 @@ func TestReplicaCalcWithinAbsoluteExternal(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.2,
+				Tolerance: 20,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -1054,7 +1054,7 @@ func TestReplicaCalcBelowAverageExternal_Downscale1(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.01,
+				Tolerance: 1,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -1086,7 +1086,7 @@ func TestReplicaCalcBelowAverageExternal_Downscale2(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.01,
+				Tolerance: 1,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -1118,7 +1118,7 @@ func TestReplicaCalcBelowAverageExternal_Downscale3(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.01,
+				Tolerance: 1,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -1150,7 +1150,7 @@ func TestPendingtExpiredScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.01,
+				Tolerance: 1,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},
@@ -1187,7 +1187,7 @@ func TestPendingNotExpiredScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm:             "absolute",
-				Tolerance:             0.01,
+				Tolerance:             1,
 				ReadinessDelaySeconds: readinessDelay,
 				Metrics:               []v1.MetricSpec{metric1},
 			},
@@ -1242,7 +1242,7 @@ func TestPendingExpiredHigherWatermarkDownscale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm:             "absolute",
-				Tolerance:             0.01,
+				Tolerance:             1,
 				ReadinessDelaySeconds: readinessDelay,
 				Metrics:               []v1.MetricSpec{metric1},
 			},
@@ -1298,7 +1298,7 @@ func TestPendingNotExpiredWithinBoundsNoScale(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm:             "absolute",
-				Tolerance:             0.01,
+				Tolerance:             1,
 				ReadinessDelaySeconds: readinessDelay,
 				Metrics:               []v1.MetricSpec{metric1},
 			},
@@ -1353,7 +1353,7 @@ func TestPendingNotOverlyScaling(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm:             "absolute",
-				Tolerance:             0.01,
+				Tolerance:             1,
 				ReadinessDelaySeconds: readinessDelay,
 				Metrics:               []v1.MetricSpec{shpaMetricSpec},
 			},
@@ -1425,7 +1425,7 @@ func TestPendingUnprotectedOverlyScaling(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "absolute",
-				Tolerance: 0.01,
+				Tolerance: 1,
 				// High to force the consideration of pending pods as running
 				ReadinessDelaySeconds: 6000,
 				Metrics:               []v1.MetricSpec{metric1},
@@ -1494,7 +1494,7 @@ func TestReplicaCalcBelowAverageExternal_Downscale4(t *testing.T) {
 		shpa: &v1.SHPA{
 			Spec: v1.SHPASpec{
 				Algorithm: "average",
-				Tolerance: 0.01,
+				Tolerance: 1,
 				Metrics:   []v1.MetricSpec{metric1},
 			},
 		},

@@ -50,10 +50,12 @@ type SHPA struct {
 }
 
 // SHPASpec defines the desired state of SHPA
+// +k8s:openapi-gen=true
 type SHPASpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// part of HorizontalController, see comments in the k8s repo: pkg/controller/podautoscaler/horizontal.go
+
 	// +kubebuilder:validation:Minimum=1
 	DownscaleForbiddenWindowSeconds int32 `json:"downscaleForbiddenWindowSeconds,omitempty"`
 
@@ -63,18 +65,18 @@ type SHPASpec struct {
 	// Percentage of replicas that can be added in an upscale event. Max value will set the limit at the Maximum number of Replicas.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=100
-	ScaleUpLimitFactor float64 `json:"scaleUpLimitFactor,omitempty"`
+	ScaleUpLimitFactor int32 `json:"scaleUpLimitFactor,omitempty"`
 
 	// Percentage of replicas that can be added in an upscale event. Max value will set the limit at the Maximum number of Replicas.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=100
-	ScaleDownLimitFactor float64 `json:"scaleDownLimitFactor,omitempty"`
+	ScaleDownLimitFactor int32 `json:"scaleDownLimitFactor,omitempty"`
 
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:ExclusiveMinimum=true
-	// +kubebuilder:validation:Maximum=1
+	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:validation:ExclusiveMaximum=true
-	Tolerance float64 `json:"tolerance,omitempty"`
+	Tolerance int32 `json:"tolerance,omitempty"`
 
 	// computed values take the # of replicas into account
 	Algorithm string `json:"algorithm,omitempty"`
@@ -87,7 +89,6 @@ type SHPASpec struct {
 	// and will set the desired number of pods by using its Scale subresource.
 	ScaleTargetRef CrossVersionObjectReference `json:"scaleTargetRef"`
 	// specifications that will be used to calculate the desired replica count
-	// +listType=set
 	Metrics []MetricSpec `json:"metrics,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	MinReplicas int32 `json:"minReplicas,omitempty"`
@@ -98,17 +99,16 @@ type SHPASpec struct {
 }
 
 // SHPAStatus defines the observed state of SHPA
+// +k8s:openapi-gen=true
 type SHPAStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	ObservedGeneration *int64       `json:"observedGeneration,omitempty"`
-	LastScaleTime      *metav1.Time `json:"lastScaleTime,omitempty"`
-	CurrentReplicas    int32        `json:"currentReplicas"`
-	DesiredReplicas    int32        `json:"desiredReplicas"`
-	// +listType=set
-	CurrentMetrics []autoscalingv2.MetricStatus `json:"currentMetrics"`
-	// +listType=set
-	Conditions []autoscalingv2.HorizontalPodAutoscalerCondition `json:"conditions"`
+	ObservedGeneration *int64                                           `json:"observedGeneration,omitempty"`
+	LastScaleTime      *metav1.Time                                     `json:"lastScaleTime,omitempty"`
+	CurrentReplicas    int32                                            `json:"currentReplicas"`
+	DesiredReplicas    int32                                            `json:"desiredReplicas"`
+	CurrentMetrics     []autoscalingv2.MetricStatus                     `json:"currentMetrics"`
+	Conditions         []autoscalingv2.HorizontalPodAutoscalerCondition `json:"conditions"`
 }
 
 // +kubebuilder:object:root=true
@@ -125,6 +125,7 @@ type CrossVersionObjectReference struct {
 }
 
 // SHPAList contains a list of SHPA
+// +k8s:openapi-gen=true
 type SHPAList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -1,0 +1,22 @@
+apiVersion: dbishpa.my.shpa/v1
+kind: SHPA
+metadata:
+  name: example-resource-shpa
+spec:
+  maxReplicas: 10
+  minReplicas: 2
+  tolerance: 1
+  readinessDelay: 10
+  scaleTargetRef:
+    kind: Deployment
+    apiVersion: apps/v1
+    name: nginx
+  metrics:
+  - type: Resource
+    resource:
+      highWatermark: "300Mi"
+      lowWatermark: "50Mi"
+      name: memory
+      metricSelector:
+        matchLabels:
+          app: nginx # Match the targeted nginx pods using the pod label app=nginx
