@@ -160,8 +160,8 @@ func (c *ReplicaCalculator) GetResourceReplicas(logger logr.Logger, target *auto
 
 func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas int32, shpa *v1.SHPA, name string, adjustedUsage float64, lowMark, highMark *resource.Quantity) (replicaCount int32, utilization int64) {
 	utilizationQuantity := resource.NewMilliQuantity(int64(adjustedUsage), resource.DecimalSI)
-	adjustedHM := float64(highMark.MilliValue()) + (shpa.Spec.Tolerance/float64(100))*float64(highMark.MilliValue())
-	adjustedLM := float64(lowMark.MilliValue()) - (shpa.Spec.Tolerance/float64(100))*float64(lowMark.MilliValue())
+	adjustedHM := float64(highMark.MilliValue()) + float64(shpa.Spec.Tolerance)/100*float64(highMark.MilliValue())
+	adjustedLM := float64(lowMark.MilliValue()) - float64(shpa.Spec.Tolerance)/100*float64(lowMark.MilliValue())
 
 	switch {
 	case adjustedUsage > adjustedHM:

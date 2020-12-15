@@ -750,10 +750,10 @@ func (r *SHPAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // Scaleup limit is used to maximize the upscaling rate.
 func calculateScaleUpLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
 	// returns TO how much we can upscale, not BY how much.
-	return int32(float64(currentReplicas) + math.Max(1, math.Floor(shpa.Spec.ScaleUpLimitFactor/100*float64(currentReplicas))))
+	return int32(float64(currentReplicas) + math.Max(1, math.Floor(float64(shpa.Spec.ScaleUpLimitFactor)/100*float64(currentReplicas))))
 }
 
 // Scaledown limit is used to maximize the downscaling rate.
 func calculateScaleDownLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
-	return int32(float64(currentReplicas) - math.Max(1, math.Floor(shpa.Spec.ScaleDownLimitFactor/100*float64(currentReplicas))))
+	return int32(float64(currentReplicas) - math.Max(1, math.Floor(float64(shpa.Spec.ScaleDownLimitFactor)/100*float64(currentReplicas))))
 }

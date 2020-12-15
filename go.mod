@@ -10,10 +10,10 @@ require (
 	github.com/mikefarah/yq/v3 v3.0.0-20200615114226-086f0ec6b9aa // indirect
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
-	github.com/operator-framework/operator-sdk v0.13.0 // indirect
+	github.com/operator-framework/operator-sdk v0.13.0
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/prometheus/common v0.6.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
