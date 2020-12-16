@@ -193,7 +193,6 @@ type SHPAReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployment,verbs=get;list;update;patch
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas/status,verbs=get;update;patch
-
 func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	logger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 	logger.Info("Reconciling SHPA")
