@@ -13,6 +13,7 @@ import (
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"math"
 	"sidecar-hpa/algorithm/util"
+	dbishpav1 "sidecar-hpa/api/v1"
 	v1 "sidecar-hpa/api/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"strings"
@@ -276,4 +277,15 @@ func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodCondition
 		}
 	}
 	return -1, nil
+}
+
+// Scaleup limit is used to maximize the upscaling rate.
+func (c *WatermarkCal) CalculateScaleUpLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
+	// returns TO how much we can upscale, not BY how much.
+	return int32(float64(currentReplicas) + math.Max(1, math.Floor(float64(shpa.Spec.ScaleUpLimitFactor)/100*float64(currentReplicas))))
+}
+
+// Scaledown limit is used to maximize the downscaling rate.
+func (c *WatermarkCal) CalculateScaleDownLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
+	return int32(float64(currentReplicas) - math.Max(1, math.Floor(float64(shpa.Spec.ScaleDownLimitFactor)/100*float64(currentReplicas))))
 }
