@@ -14,10 +14,6 @@ var Algorithms = map[string]InitFunc{
 // The bool indicates whether the controller was enabled.
 type InitFunc func(clientConfig *rest.Config) ReplicaCalculatorItf
 
-func init() {
-
-}
-
 // TODO: return an algorithm from SHPA.Spec.Algorithm
 func GetAlgorithmFunc(algName string) InitFunc {
 
