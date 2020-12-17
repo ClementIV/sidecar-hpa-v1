@@ -28,11 +28,12 @@ type WatermarkCal struct {
 }
 
 // NewReplicaCalculator returns a ReplicaCalculator object reference
-func NewWatermarkReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister) *WatermarkCal {
+func NewWatermarkReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister) util.ReplicaCalculatorItf {
 	return &WatermarkCal{
 		metricsClient: metricsClient,
 		podLister:     podLister,
 	}
+
 }
 
 var _ util.ReplicaCalculatorItf = &WatermarkCal{}
