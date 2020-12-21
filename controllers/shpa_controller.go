@@ -498,62 +498,45 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 		var metricNameProposal string
 		switch metricSpec.Type {
 		case dbishpav1.ExternalMetricSourceType:
-			if metricSpec.External.HighWatermark != nil && metricSpec.External.LowWatermark != nil {
-				metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
+			replicaCalculation, errMetricsServer := r.replicaCalc.GetExternalMetricReplicas(logger, scale, metricSpec, shpa)
+			if errMetricsServer != nil {
+				return replicaCalculation.ReplicaCount, nil, replicaCalculation.Timestamp, errMetricsServer
+			}
+			metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
 
-				replicaCalculation, errMetricsServer := r.replicaCalc.GetExternalMetricReplicas(logger, scale, metricSpec, shpa)
+			replicaCountProposal = replicaCalculation.ReplicaCount
+			timestampProposal = replicaCalculation.Timestamp
+			utilizationProposal = replicaCalculation.Utilization
 
-				if errMetricsServer != nil {
-					r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetExternalMetric", errMetricsServer.Error())
-					setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", errMetricsServer)
-					return 0, nil, time.Time{}, fmt.Errorf("failed to get external metric %s: %v", metricSpec.External.MetricName, errMetricsServer)
-				}
-				replicaCountProposal = replicaCalculation.ReplicaCount
-				timestampProposal = replicaCalculation.Timestamp
-				utilizationProposal = replicaCalculation.Utilization
-
-				statuses[i] = autoscalingv2.MetricStatus{
-					Type: autoscalingv2.ExternalMetricSourceType,
-					External: &autoscalingv2.ExternalMetricStatus{
-						MetricSelector: metricSpec.External.MetricSelector,
-						MetricName:     metricSpec.External.MetricName,
-						CurrentValue:   *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
-					},
-				}
-
-			} else {
-				errMsg := "invalid external metric source: the high watermark and the low watermark are required"
-				r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetExternalMetric", errMsg)
-				setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetExternalMetrics", "the SHPA was unable to compute the replica count: %v", err)
-				return 0, nil, time.Time{}, fmt.Errorf(errMsg)
+			statuses[i] = autoscalingv2.MetricStatus{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricStatus{
+					MetricSelector: metricSpec.External.MetricSelector,
+					MetricName:     metricSpec.External.MetricName,
+					CurrentValue:   *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+				},
 			}
 		case dbishpav1.ResourceMetricSourceType:
-			if metricSpec.Resource.HighWatermark != nil && metricSpec.Resource.LowWatermark != nil {
-				metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.Resource.Name, metricSpec.Resource.MetricSelector.MatchLabels)
+			replicaCalculation, errMetricsServer := r.replicaCalc.GetResourceReplicas(logger, scale, metricSpec, shpa)
+			if errMetricsServer != nil {
+				return replicaCalculation.ReplicaCount, nil, replicaCalculation.Timestamp, errMetricsServer
+			}
+			metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
 
-				replicaCalculation, errMetricsServer := r.replicaCalc.GetResourceReplicas(logger, scale, metricSpec, shpa)
-				if errMetricsServer != nil {
-					r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetResourceMetric", errMetricsServer.Error())
-					setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetResourceMetric", "the SHPA was unable to compute the replica count: %v", errMetricsServer)
-					return 0, nil, time.Time{}, fmt.Errorf("failed to get resource metric %s: %v", metricSpec.Resource.Name, errMetricsServer)
-				}
+			replicaCountProposal = replicaCalculation.ReplicaCount
+			timestampProposal = replicaCalculation.Timestamp
+			utilizationProposal = replicaCalculation.Utilization
 
-				replicaCountProposal = replicaCalculation.ReplicaCount
-				utilizationProposal = replicaCalculation.Utilization
-				timestampProposal = replicaCalculation.Timestamp
+			replicaCountProposal = replicaCalculation.ReplicaCount
+			utilizationProposal = replicaCalculation.Utilization
+			timestampProposal = replicaCalculation.Timestamp
 
-				statuses[i] = autoscalingv2.MetricStatus{
-					Type: autoscalingv2.ResourceMetricSourceType,
-					Resource: &autoscalingv2.ResourceMetricStatus{
-						Name:                metricSpec.Resource.Name,
-						CurrentAverageValue: *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
-					},
-				}
-			} else {
-				errMsg := "invalid resource metric source: the high watermark and the low watermark are required"
-				r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetResourceMetric", errMsg)
-				setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetResourceMetric", "thee SHPA was unable to compute the replica count:%v", err)
-				return 0, nil, time.Time{}, fmt.Errorf(errMsg)
+			statuses[i] = autoscalingv2.MetricStatus{
+				Type: autoscalingv2.ResourceMetricSourceType,
+				Resource: &autoscalingv2.ResourceMetricStatus{
+					Name:                metricSpec.Resource.Name,
+					CurrentAverageValue: *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+				},
 			}
 		default:
 			return 0, nil, time.Time{}, fmt.Errorf("metricSpec.Type:%s not supported", metricSpec.Type)

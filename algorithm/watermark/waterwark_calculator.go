@@ -42,6 +42,22 @@ var _ util.ReplicaCalculatorItf = &WatermarkCal{}
 // target metric value (as a milli-value) for the external metric in the given
 // namespace, and the current replica count.
 func (c *WatermarkCal) GetExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
+	var errMsg error = nil
+	if metric.External.HighWatermark != nil && metric.External.LowWatermark != nil {
+		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
+		replical, errMetricsServer := c.computeForExternalMetricReplicas(logger, target, metric, shpa)
+		if errMetricsServer != nil {
+			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.External.MetricName, errMetricsServer)
+		} else {
+			return replical, nil
+		}
+	}
+	if errMsg == nil {
+		errMsg = fmt.Errorf("invalid external metric source: the high watermark and the low watermark are required")
+	}
+	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
+}
+func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
 	lbl, err := labels.Parse(target.Status.Selector)
 	if err != nil {
 		logger.Error(err, "Could not parse the labels of the target")
@@ -86,6 +102,24 @@ func (c *WatermarkCal) GetExternalMetricReplicas(logger logr.Logger, target *aut
 // GetResourceReplicas calculates the desired replica count based on a target resource utilization percentage
 // of the given resource for pods matching the given selector in the given namespace, and the current replica count
 func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
+
+	var errMsg error = nil
+	if metric.External.HighWatermark != nil && metric.External.LowWatermark != nil {
+		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
+		replical, errMetricsServer := c.computeResourceCount(logger, target, metric, shpa)
+		if errMetricsServer != nil {
+			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.External.MetricName, errMetricsServer)
+		} else {
+			return replical, nil
+		}
+	}
+	if errMsg == nil {
+		errMsg = fmt.Errorf("invalid external metric source: the high watermark and the low watermark are required")
+	}
+	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
+}
+
+func (c *WatermarkCal) computeResourceCount(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
 
 	resourceName := metric.Resource.Name
 	selector := metric.Resource.MetricSelector
@@ -137,7 +171,6 @@ func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscali
 	replicaCount, utilizationQuantity := getReplicaCount(logger, target.Status.Replicas, int32(readyPodCount), shpa, string(resourceName), adjustedUsage, metric.Resource.LowWatermark, metric.Resource.HighWatermark)
 	return util.ReplicaCalculation{replicaCount, utilizationQuantity, timestamp}, nil
 }
-
 func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas int32, shpa *v1.SHPA, name string, adjustedUsage float64, lowMark, highMark *resource.Quantity) (replicaCount int32, utilization int64) {
 	utilizationQuantity := resource.NewMilliQuantity(int64(adjustedUsage), resource.DecimalSI)
 	adjustedHM := float64(highMark.MilliValue()) + float64(shpa.Spec.Tolerance)/100*float64(highMark.MilliValue())
