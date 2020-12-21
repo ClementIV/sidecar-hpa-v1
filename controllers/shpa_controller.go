@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	kuctrl "k8s.io/kubernetes/pkg/controller"
 	"math"
+	"sidecar-hpa/algorithm"
 	"sidecar-hpa/algorithm/util"
 	dbishpav1 "sidecar-hpa/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -102,7 +103,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	replicaCalc := util.GetAlgorithmFunc("watermark")(clientConfig)
+	replicaCalc := algorithm.GetAlgorithmFunc("watermark")(clientConfig)
 	// TODO MAKE SHPA
 	r := &SHPAReconciler{
 		client:        mgr.GetClient(),
