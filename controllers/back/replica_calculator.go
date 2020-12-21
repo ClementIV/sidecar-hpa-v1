@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package back
 
 import (
 	"fmt"
 	"math"
 	v1 "sidecar-hpa/api/v1"
+	"sidecar-hpa/controllers"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -32,6 +34,10 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"time"
+)
+
+var (
+	log = logf.Log.WithName("back")
 )
 
 // ReplicaCalculation is used to compute the scaling recommendation.
@@ -68,7 +74,7 @@ func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister c
 func (c *ReplicaCalculator) GetExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (ReplicaCalculation, error) {
 	lbl, err := labels.Parse(target.Status.Selector)
 	if err != nil {
-		log.Error(err, "Could not parse the labels of the target")
+		controllers.Log.Error(err, "Could not parse the labels of the target")
 	}
 	currentReadyReplicas, err := c.getReadyPodsCount(target, lbl, time.Duration(shpa.Spec.ReadinessDelaySeconds)*time.Second)
 	if err != nil {
@@ -212,7 +218,7 @@ func (c *ReplicaCalculator) getReadyPodsCount(target *autoscalingv1.Scale, selec
 			toleratedAsReadyPodCount++
 		}
 	}
-	log.Info("getReadyPodsCount", "full podList length", len(podList), "toleratedAsReadyPodCount", toleratedAsReadyPodCount, "incorrectly targeted pods", incorrectTargetPodsCount)
+	controllers.Log.Info("getReadyPodsCount", "full podList length", len(podList), "toleratedAsReadyPodCount", toleratedAsReadyPodCount, "incorrectly targeted pods", incorrectTargetPodsCount)
 	if toleratedAsReadyPodCount == 0 {
 		return 0, fmt.Errorf("among the %d pods, none is ready. Skipping recommendation", len(podList))
 	}

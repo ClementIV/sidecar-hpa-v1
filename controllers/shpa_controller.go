@@ -42,10 +42,8 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
 	kuctrl "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	"k8s.io/metrics/pkg/client/external_metrics"
 	"math"
+	"sidecar-hpa/algorithm/util"
 	dbishpav1 "sidecar-hpa/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,7 +65,7 @@ const (
 )
 
 var (
-	log                                                                = logf.Log.WithName(subsystem)
+	Log                                                                = logf.Log.WithName(subsystem)
 	dryRunCondition autoscalingv2.HorizontalPodAutoscalerConditionType = "DryRun"
 )
 
@@ -88,17 +86,9 @@ func initializePodInformer(clientConfig *rest.Config, stop chan struct{}) lister
 //newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	clientConfig := mgr.GetConfig()
-	metricsClient := metrics.NewRESTMetricsClient(
-		resourceclient.NewForConfigOrDie(clientConfig),
-		nil,
-		external_metrics.NewForConfigOrDie(clientConfig),
-	)
-	var stop chan struct{}
-	podLister := initializePodInformer(clientConfig, stop)
-
 	clientSet, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		log.Error(err, "Error while instantiating the Client configuration.")
+		Log.Error(err, "Error while instantiating the Client configuration.")
 		return nil, err
 	}
 
@@ -109,11 +99,11 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(clientSet.Discovery())
 	scaleClient, err := scale.NewForConfig(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		log.Error(err, "Error while instantiating the scale client")
+		Log.Error(err, "Error while instantiating the scale client")
 		return nil, err
 	}
 
-	replicaCalc := NewReplicaCalculator(metricsClient, podLister)
+	replicaCalc := util.GetAlgorithmFunc("watermark")(clientConfig)
 	// TODO MAKE SHPA
 	r := &SHPAReconciler{
 		client:        mgr.GetClient(),
@@ -183,7 +173,7 @@ type SHPAReconciler struct {
 	Scheme        *runtime.Scheme
 	syncPeriod    time.Duration
 	eventRecorder record.EventRecorder
-	replicaCalc   ReplicaCalculatorItf
+	replicaCalc   util.ReplicaCalculatorItf
 }
 
 // Reconcile reads that state of the cluster for a SHPA object and makes changes based on the state read
@@ -194,7 +184,7 @@ type SHPAReconciler struct {
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas/status,verbs=get;update;patch
 func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	logger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
+	logger := Log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 	logger.Info("Reconciling SHPA")
 
 	// resRepeat will be returned if we want to re-run reconcile process
@@ -518,9 +508,9 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 					setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", errMetricsServer)
 					return 0, nil, time.Time{}, fmt.Errorf("failed to get external metric %s: %v", metricSpec.External.MetricName, errMetricsServer)
 				}
-				replicaCountProposal = replicaCalculation.replicaCount
-				timestampProposal = replicaCalculation.timestamp
-				utilizationProposal = replicaCalculation.utilization
+				replicaCountProposal = replicaCalculation.ReplicaCount
+				timestampProposal = replicaCalculation.Timestamp
+				utilizationProposal = replicaCalculation.Utilization
 
 				statuses[i] = autoscalingv2.MetricStatus{
 					Type: autoscalingv2.ExternalMetricSourceType,
@@ -548,9 +538,9 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 					return 0, nil, time.Time{}, fmt.Errorf("failed to get resource metric %s: %v", metricSpec.Resource.Name, errMetricsServer)
 				}
 
-				replicaCountProposal = replicaCalculation.replicaCount
-				utilizationProposal = replicaCalculation.utilization
-				timestampProposal = replicaCalculation.timestamp
+				replicaCountProposal = replicaCalculation.ReplicaCount
+				utilizationProposal = replicaCalculation.Utilization
+				timestampProposal = replicaCalculation.Timestamp
 
 				statuses[i] = autoscalingv2.MetricStatus{
 					Type: autoscalingv2.ResourceMetricSourceType,
