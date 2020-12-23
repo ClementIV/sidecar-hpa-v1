@@ -12,12 +12,12 @@ spec:
   scaleTargetRef:
     kind: Deployment
     apiVersion: apps/v1
-    name: nginx
+    name: shpa-ss
   metrics:
     - external:
-        highWatermark: 400m
-        lowWatermark: 150m
-        metricName: custom.request_duration.max
+        highWatermark: 100m
+        lowWatermark: 50m
+        metricName: cpu
         metricSelector:
           matchLabels:
             kubernetes_cluster: mycluster

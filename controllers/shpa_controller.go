@@ -711,14 +711,6 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	return resList
 }
 
-// Stolen from upstream
-
-func (r *SHPAReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&dbishpav1.SHPA{}).
-		Complete(r)
-}
-
 // Scaleup limit is used to maximize the upscaling rate.
 func calculateScaleUpLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
 	// returns TO how much we can upscale, not BY how much.
