@@ -179,7 +179,7 @@ func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas i
 		replicaCount = int32(math.Max(float64(replicaCount), 1))
 		logger.Info("Value is below lowMark", "usage", utilizationQuantity.String(), "replicaCount", replicaCount, "currentReadyReplicas", currentReadyReplicas)
 	default:
-		logger.Info("Within bounds of the watermarks", "value", utilizationQuantity.String(), "low watermark", lowMark.String(), "high watermark", highMark.String(), "tolerance", shpa.Spec.Tolerance)
+		logger.Info("Within bounds of the watermarks", "value", utilizationQuantity.String(), "low shpa", lowMark.String(), "high shpa", highMark.String(), "tolerance", shpa.Spec.Tolerance)
 		// returning the currentReplicas instead of the count of healthy ones to be consistent with the upstream behavior.
 		return currentReplicas, utilizationQuantity.MilliValue()
 	}

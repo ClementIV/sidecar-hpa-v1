@@ -7,7 +7,7 @@ import (
 )
 
 var Algorithms = map[string]AlgFunc{
-	"watermark": watermark.NewWatermark,
+	"shpa": watermark.NewWatermark,
 }
 
 // AlgFunc is used to launch a particular controller.  It may run additional "should I activate checks".

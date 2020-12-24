@@ -13,10 +13,10 @@ spec:
     name: value
     type: string
   - JSONPath: .spec.metrics[*].external.highWatermark..
-    name: high watermark
+    name: high shpa
     type: string
   - JSONPath: .spec.metrics[*].external.lowWatermark..
-    name: low watermark
+    name: low shpa
     type: string
   - JSONPath: .metadata.creationTimestamp
     name: age

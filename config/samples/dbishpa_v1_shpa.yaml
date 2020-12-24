@@ -1,27 +1,22 @@
 apiVersion: dbishpa.my.shpa/v1
 kind: SHPA
 metadata:
-  name: shpa-sample
+  name: shpa-shpa
 spec:
-  downscaleForbiddenWindowSeconds: 60
-  upscaleForbiddenWindowSeconds: 30
-  scaleDownLimitFactor: 30
-  scaleUpLimitFactor: 50
+  maxReplicas: 20
   minReplicas: 4
-  maxReplicas: 9
+  tolerance: 1
+  readinessDelay: 10
   scaleTargetRef:
     kind: Deployment
     apiVersion: apps/v1
     name: shpa-ss
   metrics:
-    - external:
-        highWatermark: 100m
-        lowWatermark: 50m
-        metricName: cpu
+    - type: Resource
+      resource:
+        highWatermark: "100m"
+        lowWatermark: "50m"
+        name: cpu
         metricSelector:
           matchLabels:
-            kubernetes_cluster: mycluster
-            service: billing
-            short_image: billing-app
-      type: External
-  tolerance: 1
+            app: shpa-ss # Match the targeted nginx pods using the pod label app=nginx

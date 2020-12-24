@@ -53,7 +53,7 @@ func (c *WatermarkCal) GetExternalMetricReplicas(logger logr.Logger, target *aut
 		}
 	}
 	if errMsg == nil {
-		errMsg = fmt.Errorf("invalid external metric source: the high watermark and the low watermark are required")
+		errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
 	}
 	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 }
@@ -114,7 +114,7 @@ func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscali
 		}
 	}
 	if errMsg == nil {
-		errMsg = fmt.Errorf("invalid external metric source: the high watermark and the low watermark are required")
+		errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
 	}
 	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 }
@@ -186,7 +186,7 @@ func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas i
 		replicaCount = int32(math.Max(float64(replicaCount), 1))
 		logger.Info("Value is below lowMark", "usage", utilizationQuantity.String(), "replicaCount", replicaCount, "currentReadyReplicas", currentReadyReplicas)
 	default:
-		logger.Info("Within bounds of the watermarks", "value", utilizationQuantity.String(), "low watermark", lowMark.String(), "high watermark", highMark.String(), "tolerance", shpa.Spec.Tolerance)
+		logger.Info("Within bounds of the watermarks", "value", utilizationQuantity.String(), "low shpa", lowMark.String(), "high shpa", highMark.String(), "tolerance", shpa.Spec.Tolerance)
 		// returning the currentReplicas instead of the count of healthy ones to be consistent with the upstream behavior.
 		return currentReplicas, utilizationQuantity.MilliValue()
 	}

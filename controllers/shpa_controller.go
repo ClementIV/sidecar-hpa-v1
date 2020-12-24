@@ -103,7 +103,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	replicaCalc := algorithm.GetAlgorithmFunc("watermark")(clientConfig)
+	replicaCalc := algorithm.GetAlgorithmFunc("shpa")(clientConfig)
 	// TODO MAKE SHPA
 	r := &SHPAReconciler{
 		client:        mgr.GetClient(),

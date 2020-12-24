@@ -92,7 +92,7 @@ func CheckSHPAValidity(shpa *SHPA) error {
 		return fmt.Errorf(msg)
 	}
 	if shpa.Spec.MinReplicas == 0 || shpa.Spec.MaxReplicas < shpa.Spec.MinReplicas {
-		msg := fmt.Sprintf("watermark pod autoscaler requires the minimum number of replicas to be configured and inferior to the maximum")
+		msg := fmt.Sprintf("shpa pod autoscaler requires the minimum number of replicas to be configured and inferior to the maximum")
 		return fmt.Errorf(msg)
 	}
 	return checkSPAMetricsValidity(shpa)

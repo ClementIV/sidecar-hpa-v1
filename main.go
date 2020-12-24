@@ -30,7 +30,7 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	"github.com/operator-framework/operator-sdk/pkg/restmapper"
-	"sidecar-hpa/api"
+	shpav1 "sidecar-hpa/api/v1"
 	"sidecar-hpa/controllers"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -110,7 +110,7 @@ func main() {
 	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources
-	if err = apis.AddToScheme(mgr.GetScheme()); err != nil {
+	if err = shpav1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}

@@ -33,8 +33,8 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="value",type="string",JSONPath=".status.currentMetrics[*].external.currentValue.."
-// +kubebuilder:printcolumn:name="high watermark",type="string",JSONPath=".spec.metrics[*].external.highWatermark.."
-// +kubebuilder:printcolumn:name="low watermark",type="string",JSONPath=".spec.metrics[*].external.lowWatermark.."
+// +kubebuilder:printcolumn:name="high shpa",type="string",JSONPath=".spec.metrics[*].external.highWatermark.."
+// +kubebuilder:printcolumn:name="low shpa",type="string",JSONPath=".spec.metrics[*].external.lowWatermark.."
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="min replicas",type="integer",JSONPath=".spec.minReplicas"
 // +kubebuilder:printcolumn:name="max replicas",type="integer",JSONPath=".spec.maxReplicas"
@@ -112,7 +112,6 @@ type SHPAStatus struct {
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
-// +k8s:openapi-gen=true
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
 	Kind string `json:"kind"`
