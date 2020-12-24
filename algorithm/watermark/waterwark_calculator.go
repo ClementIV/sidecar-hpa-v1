@@ -80,7 +80,7 @@ func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, targ
 
 	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, shpa.Namespace, labelSelector)
 	if err != nil {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", shpa.Namespace, metricName, selector, err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", shpa.Namespace, metricName, selector, err)
 	}
 	logger.Info("Metrics from the External Metrics Provider", "metrics", metrics)
 
@@ -93,9 +93,9 @@ func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, targ
 	adjustedUsage := float64(sum) / averaged
 	replicaCount, utilizationQuantity := getReplicaCount(logger, target.Status.Replicas, currentReadyReplicas, shpa, metricName, adjustedUsage, metric.External.LowWatermark, metric.External.HighWatermark)
 	return util.ReplicaCalculation{
-		replicaCount,
-		utilizationQuantity,
-		timestamp,
+		ReplicaCount: replicaCount,
+		Utilization:  utilizationQuantity,
+		Timestamp:    timestamp,
 	}, nil
 }
 
@@ -125,28 +125,28 @@ func (c *WatermarkCal) computeResourceCount(logger logr.Logger, target *autoscal
 	selector := metric.Resource.MetricSelector
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, err
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, err
 	}
 
 	namespace := shpa.Namespace
 	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resourceName, namespace, labelSelector)
 	if err != nil {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("unable to get resource metric %s/%s/%+v: %s", shpa.Namespace, resourceName, selector, err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("unable to get resource metric %s/%s/%+v: %s", shpa.Namespace, resourceName, selector, err)
 	}
 	logger.Info("Metrics from the Resource Client", "metrics", metrics)
 
 	lbl, err := labels.Parse(target.Status.Selector)
 	if err != nil {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("could not parse the labels of the target: %v", err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("could not parse the labels of the target: %v", err)
 	}
 
 	podList, err := c.podLister.Pods(namespace).List(lbl)
 	if err != nil {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
 
 	if len(podList) == 0 {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("no pods returned by selector while calculating replica count")
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 	readiness := time.Duration(shpa.Spec.ReadinessDelaySeconds) * time.Second
 	readyPods, ignoredPods := groupPods(logger, podList, target.Name, metrics, resourceName, readiness)
@@ -154,7 +154,7 @@ func (c *WatermarkCal) computeResourceCount(logger logr.Logger, target *autoscal
 
 	removeMetricsForPods(metrics, ignoredPods)
 	if len(metrics) == 0 {
-		return util.ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("did not receive metrics for any ready pods")
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("did not receive metrics for any ready pods")
 	}
 
 	averaged := 1.0
@@ -169,7 +169,7 @@ func (c *WatermarkCal) computeResourceCount(logger logr.Logger, target *autoscal
 	adjustedUsage := float64(sum) / averaged
 
 	replicaCount, utilizationQuantity := getReplicaCount(logger, target.Status.Replicas, int32(readyPodCount), shpa, string(resourceName), adjustedUsage, metric.Resource.LowWatermark, metric.Resource.HighWatermark)
-	return util.ReplicaCalculation{replicaCount, utilizationQuantity, timestamp}, nil
+	return util.ReplicaCalculation{ReplicaCount: replicaCount, Utilization: utilizationQuantity, Timestamp: timestamp}, nil
 }
 func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas int32, shpa *v1.SHPA, name string, adjustedUsage float64, lowMark, highMark *resource.Quantity) (replicaCount int32, utilization int64) {
 	utilizationQuantity := resource.NewMilliQuantity(int64(adjustedUsage), resource.DecimalSI)

@@ -19,7 +19,7 @@ package v1
 import "fmt"
 
 const (
-	defaultTolerance                       = 0.1
+	defaultTolerance                       = 10
 	defaultDownscaleForbiddenWindowSeconds = 300
 	defaultUpscaleForbiddenWindowSeconds   = 60
 	defaultScaleDownLimitFactor            = 20

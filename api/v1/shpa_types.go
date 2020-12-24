@@ -111,7 +111,6 @@ type SHPAStatus struct {
 	Conditions         []autoscalingv2.HorizontalPodAutoscalerCondition `json:"conditions"`
 }
 
-// +kubebuilder:object:root=true
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 // +k8s:openapi-gen=true
 type CrossVersionObjectReference struct {
@@ -124,6 +123,8 @@ type CrossVersionObjectReference struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 }
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // SHPAList contains a list of SHPA
 // +k8s:openapi-gen=true
 type SHPAList struct {
