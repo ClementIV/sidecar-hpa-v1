@@ -1,5 +1,5 @@
 apiVersion: dbishpa.my.shpa/v1
-kind: SHPA
+kind: shpa
 metadata:
   name: shpa-shpa
 spec:

@@ -41,8 +41,7 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
-      description: WatermarkPodAutoscaler is the Schema for the watermarkpodautoscalers
-        API SHPA is the Schema for the shpas API
+      description: SHPA is the Schema for the shpas API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
