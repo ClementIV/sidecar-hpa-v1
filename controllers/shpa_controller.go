@@ -521,7 +521,6 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 			if errMetricsServer != nil {
 				return replicaCalculation.ReplicaCount, nil, replicaCalculation.Timestamp, errMetricsServer
 			}
-			metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
 
 			replicaCountProposal = replicaCalculation.ReplicaCount
 			timestampProposal = replicaCalculation.Timestamp
