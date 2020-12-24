@@ -292,11 +292,9 @@ func (r *SHPAReconciler) reconcileSHPA(logger logr.Logger, shpa *dbishpav1.SHPA)
 	if metricStatuses == nil {
 		metricStatuses = []autoscalingv2.MetricStatus{}
 	}
-	rescale, desiredReplicas, rescaleReason, err := r.computeReplicas(logger, currentReplicas, currentScale, shpa, metricStatuses, shpaStatusOriginal, reference)
 
+	rescale, desiredReplicas, rescaleReason, err := r.computeReplicas(logger, currentReplicas, currentScale, shpa, metricStatuses, shpaStatusOriginal, reference)
 	if err != nil {
-		r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
-		logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
 		return nil
 	}
 
@@ -386,15 +384,17 @@ func (r *SHPAReconciler) computeReplicas(
 	default:
 		var metricTimestamp time.Time
 		proposeReplicas, metricStatuses, metricTimestamp, err = r.computeReplicasForMetrics(logger, shpa, currentScale)
-		if err2 := r.updateStatusIfNeeded(shpaStatusOriginal, shpa); err2 != nil {
-			r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedUpdateReplicas", err2.Error())
-			setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "FailedUpdateReplicas", "the WPA controller was unable to update the number of replicas: %v", err)
-			logger.Info("The SHPA controller was unable to update the number of replicas", "error", err2)
-			return false, desiredReplicas, "", nil
+		if err != nil {
+			if err2 := r.updateStatusIfNeeded(shpaStatusOriginal, shpa); err2 != nil {
+				r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedUpdateReplicas", err2.Error())
+				setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "FailedUpdateReplicas", "the WPA controller was unable to update the number of replicas: %v", err)
+				logger.Info("The SHPA controller was unable to update the number of replicas", "error", err2)
+				return false, desiredReplicas, "", err
+			}
+			r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
+			logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
+			return false, desiredReplicas, "", err
 		}
-		r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
-		logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
-
 		if proposeReplicas > desiredReplicas {
 			desiredReplicas = proposeReplicas
 			now = metricTimestamp
