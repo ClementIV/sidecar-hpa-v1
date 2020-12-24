@@ -1,7 +1,7 @@
 apiVersion: dbishpa.my.shpa/v1
 kind: SHPA
 metadata:
-  name: shpa-shpa
+  name: shpa-v2
 spec:
   maxReplicas: 20
   minReplicas: 4
