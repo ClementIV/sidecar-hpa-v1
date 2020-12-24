@@ -48,13 +48,12 @@ func (c *WatermarkCal) GetExternalMetricReplicas(logger logr.Logger, target *aut
 		replical, errMetricsServer := c.computeForExternalMetricReplicas(logger, target, metric, shpa)
 		if errMetricsServer != nil {
 			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.External.MetricName, errMetricsServer)
-		} else {
-			return replical, nil
+			return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 		}
+		return replical, nil
 	}
-	if errMsg == nil {
-		errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
-	}
+
+	errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
 	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 }
 func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
@@ -104,18 +103,17 @@ func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, targ
 func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
 
 	var errMsg error = nil
-	if metric.External.HighWatermark != nil && metric.External.LowWatermark != nil {
+	if metric.Resource.HighWatermark != nil && metric.Resource.LowWatermark != nil {
 		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
 		replical, errMetricsServer := c.computeResourceCount(logger, target, metric, shpa)
 		if errMetricsServer != nil {
 			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.External.MetricName, errMetricsServer)
-		} else {
-			return replical, nil
+			return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 		}
+		return replical, nil
 	}
-	if errMsg == nil {
-		errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
-	}
+
+	errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
 	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 }
 
