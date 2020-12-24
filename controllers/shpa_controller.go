@@ -387,7 +387,7 @@ func (r *SHPAReconciler) computeReplicas(
 		var metricTimestamp time.Time
 		proposeReplicas, metricStatuses, metricTimestamp, err = r.computeReplicasForMetrics(logger, shpa, currentScale)
 		if err2 := r.updateStatusIfNeeded(shpaStatusOriginal, shpa); err2 != nil {
-			r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedUpdateReplicas", err.Error())
+			r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedUpdateReplicas", err2.Error())
 			setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "FailedUpdateReplicas", "the WPA controller was unable to update the number of replicas: %v", err)
 			logger.Info("The SHPA controller was unable to update the number of replicas", "error", err2)
 			return false, desiredReplicas, "", nil
