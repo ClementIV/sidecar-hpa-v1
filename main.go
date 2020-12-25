@@ -19,7 +19,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"github.com/spf13/pflag"
 	"os"
 	"sidecar-hpa/version"
@@ -38,10 +37,6 @@ import (
 )
 
 // Change below variables to serve metrics on different host or port.
-var (
-	metricsHost       = "0.0.0.0"
-	metricsPort int32 = 8383
-)
 var log = logf.Log.WithName("cmd")
 var printVersionArg bool
 
@@ -54,7 +49,12 @@ func main() {
 	// controller-runtime)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.BoolVarP(&printVersionArg, "version", "v", printVersionArg, "print version")
-
+	var metricsAddr string
+	var enableLeaderElection bool
+	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
 	pflag.Parse()
 
 	// Use a zap logr.Logger implementation. If none of the zap
@@ -100,7 +100,7 @@ func main() {
 	mgr, err := manager.New(cfg, manager.Options{
 		Namespace:          namespace,
 		MapperProvider:     restmapper.NewDynamicRESTMapper,
-		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+		MetricsBindAddress: metricsAddr,
 	})
 	if err != nil {
 		log.Error(err, "")
