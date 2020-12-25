@@ -56,9 +56,7 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build . -t ${IMG}\
-		  --network host\
-		  --build-arg GOPROXY="https://goproxy.cn,direct"
+	docker build . -t ${IMG}
 
 # Push the docker image
 docker-push:

@@ -1,6 +1,8 @@
 # Build the manager binary
 FROM golang:1.13 as builder
 
+ENV GOPROXY="https://goproxy.io"
+ENV GO111MODULE=on
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
