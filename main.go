@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"flag"
 	"github.com/spf13/pflag"
 	"os"
@@ -26,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
-	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	"github.com/operator-framework/operator-sdk/pkg/restmapper"
 	shpav1 "sidecar-hpa/api/v1"
@@ -88,21 +86,19 @@ func main() {
 		os.Exit(1)
 	}
 	log.Info("after get config")
-	ctx := context.TODO()
 
 	// Become the leader before proceeding
 	log.Info("shpa-lock before")
-	err = leader.Become(ctx, "shpa-lock")
-	if err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
+
 	log.Info("shpa-lock end")
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
 		Namespace:          namespace,
 		MapperProvider:     restmapper.NewDynamicRESTMapper,
 		MetricsBindAddress: metricsAddr,
+		Port:               9443,
+		LeaderElection:     enableLeaderElection,
+		LeaderElectionID:   "82fad392.my.shpa",
 	})
 	if err != nil {
 		log.Error(err, "")
