@@ -43,18 +43,19 @@ var printVersionArg bool
 func main() {
 	// Add the zap logger flag set to the CLI. The flag set must
 	// be added before calling pflag.Parse().
-	pflag.CommandLine.AddFlagSet(zap.FlagSet())
-
-	// Add flags registered by imported packages (e.g. glog and
-	// controller-runtime)
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.BoolVarP(&printVersionArg, "version", "v", printVersionArg, "print version")
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	pflag.CommandLine.AddFlagSet(zap.FlagSet())
+
+	// Add flags registered by imported packages (e.g. glog and
+	// controller-runtime)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.BoolVarP(&printVersionArg, "version", "v", printVersionArg, "print version")
 	pflag.Parse()
 
 	// Use a zap logr.Logger implementation. If none of the zap

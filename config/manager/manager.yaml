@@ -28,6 +28,8 @@ spec:
         args:
         - --enable-leader-election
         image: controller:latest
+        env:
+          - WATCH_NAMESPACE=default
         name: manager
         resources:
           limits:
