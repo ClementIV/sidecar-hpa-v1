@@ -176,11 +176,12 @@ type SHPAReconciler struct {
 	replicaCalc   util.ReplicaCalculatorItf
 }
 
-// Reconcile reads that state of the cluster for a SHPA object and makes changes based on the state read
+//  Reconcile reads that state of the cluster for a SHPA object and makes changes based on the state read
 // and what is in the SHPA.Spec
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 // +kubebuilder:rbac:groups=apps,resources=deployment,verbs=get;list;update;patch
+// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas/status,verbs=get;update;patch
 func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
@@ -191,7 +192,7 @@ func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// NB: we can't return non-nil err, as the "reconcile" msg will be added to the rate-limited queue
 	// so that it'll slow down if we have several problems in a row
 	resPepeat := reconcile.Result{RequeueAfter: r.syncPeriod}
-
+	logger.Info("-------------------------daima test:get pod")
 	// Fetch the SHPA instance
 	instance := &dbishpav1.SHPA{}
 	err := r.client.Get(context.TODO(), req.NamespacedName, instance)
