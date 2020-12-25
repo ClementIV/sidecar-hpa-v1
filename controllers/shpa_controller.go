@@ -33,14 +33,10 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	discocache "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	listerv1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
-	kuctrl "k8s.io/kubernetes/pkg/controller"
 	"math"
 	"sidecar-hpa/algorithm"
 	"sidecar-hpa/algorithm/util"
@@ -69,20 +65,6 @@ var (
 	dryRunCondition autoscalingv2.HorizontalPodAutoscalerConditionType = "DryRun"
 )
 
-func initializePodInformer(clientConfig *rest.Config, stop chan struct{}) listerv1.PodLister {
-	a := kuctrl.SimpleControllerClientBuilder{ClientConfig: clientConfig}
-	versionedClient := a.ClientOrDie("sidecar-pod-autoscaler-shared-informer")
-	// Only resync every 5 minutes
-	// TODO: Consider exposing configuration of the resync for the pod informer.
-	sharedInf := informers.NewSharedInformerFactory(versionedClient, 300*time.Second)
-
-	sharedInf.Start(stop)
-
-	go sharedInf.Core().V1().Pods().Informer().Run(stop)
-
-	return sharedInf.Core().V1().Pods().Lister()
-}
-
 //newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	clientConfig := mgr.GetConfig()
@@ -91,7 +73,6 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		Log.Error(err, "Error while instantiating the Client configuration.")
 		return nil, err
 	}
-
 	//init the scaleClient
 	cachedDiscovery := discocache.NewMemCacheClient(clientSet.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
@@ -117,6 +98,12 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 
 	return r, nil
 
+}
+
+func (r *SHPAReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&dbishpav1.SHPA{}).
+		Complete(r)
 }
 
 // Add creates a new SHPA Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -181,7 +168,8 @@ type SHPAReconciler struct {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 // +kubebuilder:rbac:groups=apps,resources=deployment,verbs=get;list;update;patch
-// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list
+// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=pods/status,verbs=get;
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas/status,verbs=get;update;patch
 func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
