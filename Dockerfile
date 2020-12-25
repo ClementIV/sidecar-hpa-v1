@@ -1,7 +1,7 @@
 # Build the manager binary
 FROM golang:1.13 as builder
 
-ENV GOPROXY="https://goproxy.io"
+ENV GOPROXY="https://goproxy.cn"
 ENV GO111MODULE=on
 
 WORKDIR /workspace
