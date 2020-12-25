@@ -1,7 +1,7 @@
 # Build the manager binary
 FROM golang:1.13 as builder
 
-ENV GOPROXY="https://goproxy.cn"
+ENV GOPROXY="https://goproxy.io"
 ENV GO111MODULE=on
 
 WORKDIR /workspace
@@ -16,6 +16,8 @@ RUN go mod download
 COPY main.go main.go
 COPY api/ api/
 COPY controllers/ controllers/
+COPY algorithm/ algorithm/
+COPY version/ version/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
