@@ -102,7 +102,7 @@ func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, targ
 // of the given resource for pods matching the given selector in the given namespace, and the current replica count
 func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
 
-	var errMsg error = nil
+	var errMsg error
 	if metric.Resource.HighWatermark != nil && metric.Resource.LowWatermark != nil {
 		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
 		replical, errMetricsServer := c.computeResourceCount(logger, target, metric, shpa)
