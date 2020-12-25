@@ -2,10 +2,10 @@
 FROM golang:1.13 as builder
 
 CMD export https_proxy="https://192.168.190.114:4780"
-&&export HTTPS_PROXY="https://192.168.190.114:4780"
-&&export http_proxy="http://192.168.190.114:4780"
-&&export HTTP_PROXY="http://192.168.190.114:4780"
-&&curl www.google.com --max-time 3
+&& export HTTPS_PROXY="https://192.168.190.114:4780"
+&& export http_proxy="http://192.168.190.114:4780"
+&& export HTTP_PROXY="http://192.168.190.114:4780"
+&& curl www.google.com --max-time 3
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
