@@ -80,23 +80,24 @@ func main() {
 		log.Error(err, "Failed to get watch namespace")
 		os.Exit(1)
 	}
-
+	log.Info("after get namespace")
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
-
+	log.Info("after get config")
 	ctx := context.TODO()
 
 	// Become the leader before proceeding
+	log.Info("shpa-lock before")
 	err = leader.Become(ctx, "shpa-lock")
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
-
+	log.Info("shpa-lock end")
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
 		Namespace:          namespace,
