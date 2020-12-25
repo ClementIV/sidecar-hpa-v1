@@ -57,9 +57,8 @@ generate: controller-gen
 # Build the docker image
 docker-build: test
 	docker build\
-				--build-arg http_proxy=http://192.168.190.114:4780\
-				--build-arg https_proxy=https://192.168.190.114:4780\
-             . -t ${IMG}
+--network host\
+ . -t ${IMG}
 
 # Push the docker image
 docker-push:
