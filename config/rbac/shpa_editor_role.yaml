@@ -5,6 +5,25 @@ metadata:
   name: shpa-editor-role
 rules:
 - apiGroups:
+  - apps
+  - extensions
+  resources:
+  - replicasets/scale
+  - deployments/scale
+  - statefulsets/scale
+  verbs:
+  - update
+  - get
+- apiGroups:
+  - apps
+  - extensions
+  resourceNames:
+  - watermarkpodautoscalers
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
   - dbishpa.my.shpa
   resources:
   - shpas
@@ -22,3 +41,33 @@ rules:
   - shpas/status
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - external.metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - get
+  - watch

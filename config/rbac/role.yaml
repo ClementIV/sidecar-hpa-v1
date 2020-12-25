@@ -8,12 +8,22 @@ metadata:
 rules:
 - apiGroups:
   - apps
+  - extensions
   resources:
-  - deployment
+  - replicasets/scale
+  - deployments/scale
+  - statefulsets/scale
   verbs:
+  - update
   - get
-  - list
-  - patch
+- apiGroups:
+  - apps
+  - extensions
+  resourceNames:
+  - watermarkpodautoscalers
+  resources:
+  - deployments/finalizers
+  verbs:
   - update
 - apiGroups:
   - dbishpa.my.shpa
@@ -33,5 +43,33 @@ rules:
   - shpas/status
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
   - patch
-  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - external.metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - get
+  - watch
