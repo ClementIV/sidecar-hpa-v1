@@ -107,7 +107,7 @@ func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscali
 		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
 		replical, errMetricsServer := c.computeResourceCount(logger, target, metric, shpa)
 		if errMetricsServer != nil {
-			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.External.MetricName, errMetricsServer)
+			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.Resource.Name, errMetricsServer)
 			return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
 		}
 		return replical, nil
