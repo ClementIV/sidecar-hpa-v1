@@ -56,9 +56,8 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build\
---network host\
- . -t ${IMG}
+	docker build . -t ${IMG}\
+		  --network host
 
 # Push the docker image
 docker-push:
