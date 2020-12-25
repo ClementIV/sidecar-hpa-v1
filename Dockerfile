@@ -1,10 +1,10 @@
 # Build the manager binary
 FROM golang:1.13 as builder
 
-RUN export https_proxy "https://192.168.190.114:4780"
-RUN export HTTPS_PROXY "https://192.168.190.114:4780"
-RUN export http_proxy "http://192.168.190.114:4780"
-RUN export HTTP_PROXY "http://192.168.190.114:4780"
+RUN export https_proxy="https://192.168.190.114:4780"
+RUN export HTTPS_PROXY="https://192.168.190.114:4780"
+RUN export http_proxy="http://192.168.190.114:4780"
+RUN export HTTP_PROXY="http://192.168.190.114:4780"
 
 RUN curl www.google.com --max-time 3
 
