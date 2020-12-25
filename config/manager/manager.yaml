@@ -28,15 +28,12 @@ spec:
         args:
         - --enable-leader-election
         image: controller:latest
-        env:
-        - name: WATCH_NAMESPACE
-          value: "default"
         name: manager
         resources:
           limits:
-            cpu: 100m
-            memory: 30Mi
+            cpu: 500m
+            memory: 500Mi
           requests:
-            cpu: 100m
-            memory: 20Mi
+            cpu: 400m
+            memory: 400Mi
       terminationGracePeriodSeconds: 10
