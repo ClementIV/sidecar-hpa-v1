@@ -180,7 +180,7 @@ func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// NB: we can't return non-nil err, as the "reconcile" msg will be added to the rate-limited queue
 	// so that it'll slow down if we have several problems in a row
 	resPepeat := reconcile.Result{RequeueAfter: r.syncPeriod}
-	logger.Info("-------------------------daima test:get pod")
+	logger.Info("-------------------------daima test:get pod\n")
 	// Fetch the SHPA instance
 	instance := &dbishpav1.SHPA{}
 	err := r.client.Get(context.TODO(), req.NamespacedName, instance)

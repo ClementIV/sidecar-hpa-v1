@@ -2,6 +2,7 @@
 FROM golang:1.13 as builder
 
 ENV GOPROXY="https://goproxy.io"
+ENV HTTPS_PROXY="https:192.168.190.114:4780"
 ENV GO111MODULE=on
 
 WORKDIR /workspace
