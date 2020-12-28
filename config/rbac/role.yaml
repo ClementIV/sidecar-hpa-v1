@@ -58,7 +58,7 @@ rules:
   verbs:
   - get
   - update
-  - patch:
+  - patch
 - apiGroups:
   - external.metrics.k8s.io
   resources:
