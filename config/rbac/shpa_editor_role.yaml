@@ -18,7 +18,7 @@ rules:
   - apps
   - extensions
   resourceNames:
-  - watermarkpodautoscalers
+  - shpas
   resources:
   - deployments/finalizers
   verbs:
@@ -41,33 +41,5 @@ rules:
   - shpas/status
   verbs:
   - get
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - list
-  - watch
-- apiGroups:
-  - external.metrics.k8s.io
-  resources:
-  - '*'
-  verbs:
-  - list
-  - get
-  - watch
-- apiGroups:
-  - metrics.k8s.io
-  resources:
-  - '*'
-  verbs:
-  - list
-  - get
-  - watch
+
+
