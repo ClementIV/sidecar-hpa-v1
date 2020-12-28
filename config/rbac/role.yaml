@@ -57,6 +57,8 @@ rules:
   - shpas/status
   verbs:
   - get
+  - update
+  - patch:
 - apiGroups:
   - external.metrics.k8s.io
   resources:
