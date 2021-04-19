@@ -19,4 +19,4 @@ spec:
         name: cpu
         metricSelector:
           matchLabels:
-            app: shpa-ss # Match the targeted nginx pods using the pod label app=nginx
+            app: shpa-cp # Match the targeted nginx pods using the pod label app=nginx
