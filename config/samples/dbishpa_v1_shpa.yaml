@@ -10,7 +10,7 @@ spec:
   scaleTargetRef:
     kind: Deployment
     apiVersion: apps/v1
-    name: shpa-ss
+    name: shpa-cp
   metrics:
     - type: Resource
       resource:
