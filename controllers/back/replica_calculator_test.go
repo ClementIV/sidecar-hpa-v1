@@ -1,4 +1,4 @@
-package controllers
+package back
 
 // Unless explicitly stated otherwise all files in this repository are licensed
 // under the Apache License Version 2.0.
@@ -716,7 +716,7 @@ func TestReplicaCalcAverageScaleDownLessScale(t *testing.T) {
 		},
 		metric: &metricInfo{
 			spec:                metric1,
-			levels:              []int64{15000, 15000, 15000}, // We are below low watermark
+			levels:              []int64{15000, 15000, 15000}, // We are below low shpa
 			expectedUtilization: 15000,
 		},
 	}
@@ -967,7 +967,7 @@ func TestReplicaCalcAboveAbsoluteExternal_Upscale2(t *testing.T) {
 	tc.runTest(t)
 }
 
-// Similarly if we the average CPU consumption is down to 2% (ten times smaller than the low watermark), we want to divide by 10 the number of replicas.
+// Similarly if we the average CPU consumption is down to 2% (ten times smaller than the low shpa), we want to divide by 10 the number of replicas.
 func TestReplicaCalcAboveAbsoluteExternal_Upscale3(t *testing.T) {
 	logf.SetLogger(logf.ZapLogger(true))
 

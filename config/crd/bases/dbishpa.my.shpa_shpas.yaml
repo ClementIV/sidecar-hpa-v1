@@ -13,10 +13,10 @@ spec:
     name: value
     type: string
   - JSONPath: .spec.metrics[*].external.highWatermark..
-    name: high watermark
+    name: high shpa
     type: string
   - JSONPath: .spec.metrics[*].external.lowWatermark..
-    name: low watermark
+    name: low shpa
     type: string
   - JSONPath: .metadata.creationTimestamp
     name: age
@@ -41,8 +41,7 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
-      description: WatermarkPodAutoscaler is the Schema for the watermarkpodautoscalers
-        API SHPA is the Schema for the shpas API
+      description: SHPA is the Schema for the shpas API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

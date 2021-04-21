@@ -1,27 +1,7 @@
-/*
-
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package controllers
+package watermark
 
 import (
 	"fmt"
-	"math"
-	v1 "sidecar-hpa/api/v1"
-	"strings"
-
 	"github.com/go-logr/logr"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,48 +11,59 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"math"
+	"sidecar-hpa/algorithm/util"
+	dbishpav1 "sidecar-hpa/api/v1"
+	v1 "sidecar-hpa/api/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"strings"
 	"time"
 )
 
-// ReplicaCalculation is used to compute the scaling recommendation.
-type ReplicaCalculation struct {
-	replicaCount int32
-	utilization  int64
-	timestamp    time.Time
-}
+var log = logf.Log.WithName("watermark_algorithm")
 
-// ReplicaCalculatorItf interface for ReplicaCalculator
-type ReplicaCalculatorItf interface {
-	GetExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (replicaCalculation ReplicaCalculation, err error)
-	GetResourceReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (replicaCalculation ReplicaCalculation, err error)
-}
-
-// ReplicaCalculator is responsible for calculation of the number of replicas
-// It contains all the needed information
-type ReplicaCalculator struct {
+type WatermarkCal struct {
 	metricsClient metricsclient.MetricsClient
 	podLister     corelisters.PodLister
 }
 
 // NewReplicaCalculator returns a ReplicaCalculator object reference
-func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister) *ReplicaCalculator {
-	return &ReplicaCalculator{
+func NewWatermarkReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister) util.ReplicaCalculatorItf {
+	return &WatermarkCal{
 		metricsClient: metricsClient,
 		podLister:     podLister,
 	}
+
 }
+
+var _ util.ReplicaCalculatorItf = &WatermarkCal{}
 
 // GetExternalMetricReplicas calculates the desired replica count based on a
 // target metric value (as a milli-value) for the external metric in the given
 // namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (ReplicaCalculation, error) {
+func (c *WatermarkCal) GetExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
+	var errMsg error = nil
+	if metric.External.HighWatermark != nil && metric.External.LowWatermark != nil {
+		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
+		replical, errMetricsServer := c.computeForExternalMetricReplicas(logger, target, metric, shpa)
+		if errMetricsServer != nil {
+			errMsg = fmt.Errorf("failed to get external metric %s: %v", metric.External.MetricName, errMetricsServer)
+			return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
+		}
+		return replical, nil
+	}
+
+	errMsg = fmt.Errorf("invalid external metric source: the high shpa and the low shpa are required")
+	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
+}
+func (c *WatermarkCal) computeForExternalMetricReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
 	lbl, err := labels.Parse(target.Status.Selector)
 	if err != nil {
-		log.Error(err, "Could not parse the labels of the target")
+		logger.Error(err, "Could not parse the labels of the target")
 	}
 	currentReadyReplicas, err := c.getReadyPodsCount(target, lbl, time.Duration(shpa.Spec.ReadinessDelaySeconds)*time.Second)
 	if err != nil {
-		return ReplicaCalculation{}, fmt.Errorf("unable to get the number of ready pods across all namespaces for %v: %s", lbl, err.Error())
+		return util.ReplicaCalculation{}, fmt.Errorf("unable to get the number of ready pods across all namespaces for %v: %s", lbl, err.Error())
 	}
 	averaged := 1.0
 	if shpa.Spec.Algorithm == "average" {
@@ -83,12 +74,12 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(logger logr.Logger, target
 	selector := metric.External.MetricSelector
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
-		return ReplicaCalculation{}, err
+		return util.ReplicaCalculation{}, err
 	}
 
 	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, shpa.Namespace, labelSelector)
 	if err != nil {
-		return ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", shpa.Namespace, metricName, selector, err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", shpa.Namespace, metricName, selector, err)
 	}
 	logger.Info("Metrics from the External Metrics Provider", "metrics", metrics)
 
@@ -100,39 +91,60 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(logger logr.Logger, target
 	// if the average algorithm is used, the metrics retrieved has to be divided by the number of available replicas.
 	adjustedUsage := float64(sum) / averaged
 	replicaCount, utilizationQuantity := getReplicaCount(logger, target.Status.Replicas, currentReadyReplicas, shpa, metricName, adjustedUsage, metric.External.LowWatermark, metric.External.HighWatermark)
-	return ReplicaCalculation{replicaCount, utilizationQuantity, timestamp}, nil
+	return util.ReplicaCalculation{
+		ReplicaCount: replicaCount,
+		Utilization:  utilizationQuantity,
+		Timestamp:    timestamp,
+	}, nil
 }
 
 // GetResourceReplicas calculates the desired replica count based on a target resource utilization percentage
 // of the given resource for pods matching the given selector in the given namespace, and the current replica count
-func (c *ReplicaCalculator) GetResourceReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (ReplicaCalculation, error) {
+func (c *WatermarkCal) GetResourceReplicas(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
+
+	var errMsg error
+	if metric.Resource.HighWatermark != nil && metric.Resource.LowWatermark != nil {
+		//metricNameProposal := fmt.Sprintf("%s{%v}", metric.External.MetricName, metric.External.MetricSelector.MatchLabels)
+		replical, errMetricsServer := c.computeResourceCount(logger, target, metric, shpa)
+		if errMetricsServer != nil {
+			errMsg = fmt.Errorf("failed to get Resource metric %s: %v", metric.Resource.Name, errMetricsServer)
+			return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
+		}
+		return replical, nil
+	}
+
+	errMsg = fmt.Errorf("invalid Resource metric source: the high shpa and the low shpa are required")
+	return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, errMsg
+}
+
+func (c *WatermarkCal) computeResourceCount(logger logr.Logger, target *autoscalingv1.Scale, metric v1.MetricSpec, shpa *v1.SHPA) (util.ReplicaCalculation, error) {
 
 	resourceName := metric.Resource.Name
 	selector := metric.Resource.MetricSelector
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
-		return ReplicaCalculation{0, 0, time.Time{}}, err
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, err
 	}
 
 	namespace := shpa.Namespace
 	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resourceName, namespace, labelSelector)
 	if err != nil {
-		return ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("unable to get resource metric %s/%s/%+v: %s", shpa.Namespace, resourceName, selector, err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("unable to get resource metric %s/%s/%+v: %s", shpa.Namespace, resourceName, selector, err)
 	}
 	logger.Info("Metrics from the Resource Client", "metrics", metrics)
 
 	lbl, err := labels.Parse(target.Status.Selector)
 	if err != nil {
-		return ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("could not parse the labels of the target: %v", err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("could not parse the labels of the target: %v", err)
 	}
 
 	podList, err := c.podLister.Pods(namespace).List(lbl)
 	if err != nil {
-		return ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
 
 	if len(podList) == 0 {
-		return ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("no pods returned by selector while calculating replica count")
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 	readiness := time.Duration(shpa.Spec.ReadinessDelaySeconds) * time.Second
 	readyPods, ignoredPods := groupPods(logger, podList, target.Name, metrics, resourceName, readiness)
@@ -140,7 +152,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(logger logr.Logger, target *auto
 
 	removeMetricsForPods(metrics, ignoredPods)
 	if len(metrics) == 0 {
-		return ReplicaCalculation{0, 0, time.Time{}}, fmt.Errorf("did not receive metrics for any ready pods")
+		return util.ReplicaCalculation{ReplicaCount: 0, Utilization: 0, Timestamp: time.Time{}}, fmt.Errorf("did not receive metrics for any ready pods")
 	}
 
 	averaged := 1.0
@@ -155,9 +167,8 @@ func (c *ReplicaCalculator) GetResourceReplicas(logger logr.Logger, target *auto
 	adjustedUsage := float64(sum) / averaged
 
 	replicaCount, utilizationQuantity := getReplicaCount(logger, target.Status.Replicas, int32(readyPodCount), shpa, string(resourceName), adjustedUsage, metric.Resource.LowWatermark, metric.Resource.HighWatermark)
-	return ReplicaCalculation{replicaCount, utilizationQuantity, timestamp}, nil
+	return util.ReplicaCalculation{ReplicaCount: replicaCount, Utilization: utilizationQuantity, Timestamp: timestamp}, nil
 }
-
 func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas int32, shpa *v1.SHPA, name string, adjustedUsage float64, lowMark, highMark *resource.Quantity) (replicaCount int32, utilization int64) {
 	utilizationQuantity := resource.NewMilliQuantity(int64(adjustedUsage), resource.DecimalSI)
 	adjustedHM := float64(highMark.MilliValue()) + float64(shpa.Spec.Tolerance)/100*float64(highMark.MilliValue())
@@ -173,7 +184,7 @@ func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas i
 		replicaCount = int32(math.Max(float64(replicaCount), 1))
 		logger.Info("Value is below lowMark", "usage", utilizationQuantity.String(), "replicaCount", replicaCount, "currentReadyReplicas", currentReadyReplicas)
 	default:
-		logger.Info("Within bounds of the watermarks", "value", utilizationQuantity.String(), "low watermark", lowMark.String(), "high watermark", highMark.String(), "tolerance", shpa.Spec.Tolerance)
+		logger.Info("Within bounds of the watermarks", "value", utilizationQuantity.String(), "low shpa", lowMark.String(), "high shpa", highMark.String(), "tolerance", shpa.Spec.Tolerance)
 		// returning the currentReplicas instead of the count of healthy ones to be consistent with the upstream behavior.
 		return currentReplicas, utilizationQuantity.MilliValue()
 	}
@@ -181,7 +192,7 @@ func getReplicaCount(logger logr.Logger, currentReplicas, currentReadyReplicas i
 	return replicaCount, utilizationQuantity.MilliValue()
 }
 
-func (c *ReplicaCalculator) getReadyPodsCount(target *autoscalingv1.Scale, selector labels.Selector, readinessDelay time.Duration) (int32, error) {
+func (c *WatermarkCal) getReadyPodsCount(target *autoscalingv1.Scale, selector labels.Selector, readinessDelay time.Duration) (int32, error) {
 	podList, err := c.podLister.Pods(target.Namespace).List(selector)
 	if err != nil {
 		return 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
@@ -298,4 +309,15 @@ func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodCondition
 		}
 	}
 	return -1, nil
+}
+
+// Scaleup limit is used to maximize the upscaling rate.
+func (c *WatermarkCal) CalculateScaleUpLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
+	// returns TO how much we can upscale, not BY how much.
+	return int32(float64(currentReplicas) + math.Max(1, math.Floor(float64(shpa.Spec.ScaleUpLimitFactor)/100*float64(currentReplicas))))
+}
+
+// Scaledown limit is used to maximize the downscaling rate.
+func (c *WatermarkCal) CalculateScaleDownLimit(shpa *dbishpav1.SHPA, currentReplicas int32) int32 {
+	return int32(float64(currentReplicas) - math.Max(1, math.Floor(float64(shpa.Spec.ScaleDownLimitFactor)/100*float64(currentReplicas))))
 }

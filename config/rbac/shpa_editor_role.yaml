@@ -1,9 +1,28 @@
 # permissions for end users to edit shpas.
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: shpa-editor-role
 rules:
+- apiGroups:
+  - apps
+  - extensions
+  resources:
+  - replicasets/scale
+  - deployments/scale
+  - statefulsets/scale
+  verbs:
+  - update
+  - get
+- apiGroups:
+  - apps
+  - extensions
+  resourceNames:
+  - shpas
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
 - apiGroups:
   - dbishpa.my.shpa
   resources:
@@ -22,3 +41,5 @@ rules:
   - shpas/status
   verbs:
   - get
+
+

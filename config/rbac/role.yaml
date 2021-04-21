@@ -3,17 +3,41 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
   - apps
+  - extensions
   resources:
-  - deployment
+  - replicasets/scale
+  - deployments/scale
+  - statefulsets/scale
   verbs:
+  - update
   - get
-  - list
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
   - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - watch
+  - get
+- apiGroups:
+  - apps
+  - extensions
+  resourceNames:
+  - shpas
+  resources:
+  - deployments/finalizers
+  verbs:
   - update
 - apiGroups:
   - dbishpa.my.shpa
@@ -33,5 +57,21 @@ rules:
   - shpas/status
   verbs:
   - get
-  - patch
   - update
+  - patch
+- apiGroups:
+  - external.metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - get
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - get
+  - watch

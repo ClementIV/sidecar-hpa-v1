@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	datadoghqv1alpha1 "github.com/DataDog/watermarkpodautoscaler/pkg/apis/datadoghq/v1alpha1"
 	"github.com/go-logr/logr"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
@@ -34,18 +33,13 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	discocache "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	listerv1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
-	kuctrl "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	"k8s.io/metrics/pkg/client/external_metrics"
 	"math"
+	"sidecar-hpa/algorithm"
+	"sidecar-hpa/algorithm/util"
 	dbishpav1 "sidecar-hpa/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,41 +61,18 @@ const (
 )
 
 var (
-	log                                                                = logf.Log.WithName(subsystem)
+	Log                                                                = logf.Log.WithName(subsystem)
 	dryRunCondition autoscalingv2.HorizontalPodAutoscalerConditionType = "DryRun"
 )
-
-func initializePodInformer(clientConfig *rest.Config, stop chan struct{}) listerv1.PodLister {
-	a := kuctrl.SimpleControllerClientBuilder{ClientConfig: clientConfig}
-	versionedClient := a.ClientOrDie("sidecar-pod-autoscaler-shared-informer")
-	// Only resync every 5 minutes
-	// TODO: Consider exposing configuration of the resync for the pod informer.
-	sharedInf := informers.NewSharedInformerFactory(versionedClient, 300*time.Second)
-
-	sharedInf.Start(stop)
-
-	go sharedInf.Core().V1().Pods().Informer().Run(stop)
-
-	return sharedInf.Core().V1().Pods().Lister()
-}
 
 //newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	clientConfig := mgr.GetConfig()
-	metricsClient := metrics.NewRESTMetricsClient(
-		resourceclient.NewForConfigOrDie(clientConfig),
-		nil,
-		external_metrics.NewForConfigOrDie(clientConfig),
-	)
-	var stop chan struct{}
-	podLister := initializePodInformer(clientConfig, stop)
-
 	clientSet, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		log.Error(err, "Error while instantiating the Client configuration.")
+		Log.Error(err, "Error while instantiating the Client configuration.")
 		return nil, err
 	}
-
 	//init the scaleClient
 	cachedDiscovery := discocache.NewMemCacheClient(clientSet.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
@@ -109,11 +80,11 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(clientSet.Discovery())
 	scaleClient, err := scale.NewForConfig(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		log.Error(err, "Error while instantiating the scale client")
+		Log.Error(err, "Error while instantiating the scale client")
 		return nil, err
 	}
 
-	replicaCalc := NewReplicaCalculator(metricsClient, podLister)
+	replicaCalc := algorithm.GetAlgorithmFunc("shpa")(clientConfig)
 	// TODO MAKE SHPA
 	r := &SHPAReconciler{
 		client:        mgr.GetClient(),
@@ -127,6 +98,12 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 
 	return r, nil
 
+}
+
+func (r *SHPAReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&dbishpav1.SHPA{}).
+		Complete(r)
 }
 
 // Add creates a new SHPA Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -183,26 +160,27 @@ type SHPAReconciler struct {
 	Scheme        *runtime.Scheme
 	syncPeriod    time.Duration
 	eventRecorder record.EventRecorder
-	replicaCalc   ReplicaCalculatorItf
+	replicaCalc   util.ReplicaCalculatorItf
 }
 
-// Reconcile reads that state of the cluster for a SHPA object and makes changes based on the state read
+//  Reconcile reads that state of the cluster for a SHPA object and makes changes based on the state read
 // and what is in the SHPA.Spec
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 // +kubebuilder:rbac:groups=apps,resources=deployment,verbs=get;list;update;patch
+// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=pods/status,verbs=get;
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dbishpa.my.shpa,resources=shpas/status,verbs=get;update;patch
-
 func (r *SHPAReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	logger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
+	logger := Log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 	logger.Info("Reconciling SHPA")
 
 	// resRepeat will be returned if we want to re-run reconcile process
 	// NB: we can't return non-nil err, as the "reconcile" msg will be added to the rate-limited queue
 	// so that it'll slow down if we have several problems in a row
 	resPepeat := reconcile.Result{RequeueAfter: r.syncPeriod}
-
+	logger.Info("-------------------------daima test:get pod\n")
 	// Fetch the SHPA instance
 	instance := &dbishpav1.SHPA{}
 	err := r.client.Get(context.TODO(), req.NamespacedName, instance)
@@ -303,11 +281,9 @@ func (r *SHPAReconciler) reconcileSHPA(logger logr.Logger, shpa *dbishpav1.SHPA)
 	if metricStatuses == nil {
 		metricStatuses = []autoscalingv2.MetricStatus{}
 	}
-	rescale, desiredReplicas, rescaleReason, err := r.computeReplicas(logger, currentReplicas, currentScale, shpa, metricStatuses, shpaStatusOriginal, reference)
 
+	rescale, desiredReplicas, rescaleReason, err := r.computeReplicas(logger, currentReplicas, currentScale, shpa, metricStatuses, shpaStatusOriginal, reference)
 	if err != nil {
-		r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
-		logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
 		return nil
 	}
 
@@ -356,7 +332,7 @@ func (r *SHPAReconciler) rescaleReplicas(
 		}
 		return err
 	}
-	setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionTrue, datadoghqv1alpha1.ConditionReasonSucceededRescale, "the HPA controller was able to update the target scale to %d", desiredReplicas)
+	setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionTrue, dbishpav1.ConditionReasonSucceededRescale, "the HPA controller was able to update the target scale to %d", desiredReplicas)
 	r.eventRecorder.Eventf(shpa, corev1.EventTypeNormal, "SuccessfulRescale", fmt.Sprintf("New size: %d; reason: %s", desiredReplicas, rescaleReason))
 
 	logger.Info("Successful rescale", "currentReplicas", currentReplicas, "desiredReplicas", desiredReplicas, "rescaleReason", rescaleReason)
@@ -397,15 +373,17 @@ func (r *SHPAReconciler) computeReplicas(
 	default:
 		var metricTimestamp time.Time
 		proposeReplicas, metricStatuses, metricTimestamp, err = r.computeReplicasForMetrics(logger, shpa, currentScale)
-		if err2 := r.updateStatusIfNeeded(shpaStatusOriginal, shpa); err2 != nil {
-			r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedUpdateReplicas", err.Error())
-			setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "FailedUpdateReplicas", "the WPA controller was unable to update the number of replicas: %v", err)
-			logger.Info("The SHPA controller was unable to update the number of replicas", "error", err2)
-			return false, desiredReplicas, "", nil
+		if err != nil {
+			if err2 := r.updateStatusIfNeeded(shpaStatusOriginal, shpa); err2 != nil {
+				r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedUpdateReplicas", err2.Error())
+				setCondition(shpa, autoscalingv2.AbleToScale, corev1.ConditionFalse, "FailedUpdateReplicas", "the WPA controller was unable to update the number of replicas: %v", err)
+				logger.Info("The SHPA controller was unable to update the number of replicas", "error", err2)
+				return false, desiredReplicas, "", err
+			}
+			r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
+			logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
+			return false, desiredReplicas, "", err
 		}
-		r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
-		logger.Info("Failed to compute desired number of replicas based on listed metrics.", "reference", reference, "error", err)
-
 		if proposeReplicas > desiredReplicas {
 			desiredReplicas = proposeReplicas
 			now = metricTimestamp
@@ -509,62 +487,44 @@ func (r *SHPAReconciler) computeReplicasForMetrics(
 		var metricNameProposal string
 		switch metricSpec.Type {
 		case dbishpav1.ExternalMetricSourceType:
-			if metricSpec.External.HighWatermark != nil && metricSpec.External.LowWatermark != nil {
-				metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
+			replicaCalculation, errMetricsServer := r.replicaCalc.GetExternalMetricReplicas(logger, scale, metricSpec, shpa)
+			if errMetricsServer != nil {
+				return replicaCalculation.ReplicaCount, nil, replicaCalculation.Timestamp, errMetricsServer
+			}
+			metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.External.MetricName, metricSpec.External.MetricSelector.MatchLabels)
 
-				replicaCalculation, errMetricsServer := r.replicaCalc.GetExternalMetricReplicas(logger, scale, metricSpec, shpa)
+			replicaCountProposal = replicaCalculation.ReplicaCount
+			timestampProposal = replicaCalculation.Timestamp
+			utilizationProposal = replicaCalculation.Utilization
 
-				if errMetricsServer != nil {
-					r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetExternalMetric", errMetricsServer.Error())
-					setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", errMetricsServer)
-					return 0, nil, time.Time{}, fmt.Errorf("failed to get external metric %s: %v", metricSpec.External.MetricName, errMetricsServer)
-				}
-				replicaCountProposal = replicaCalculation.replicaCount
-				timestampProposal = replicaCalculation.timestamp
-				utilizationProposal = replicaCalculation.utilization
-
-				statuses[i] = autoscalingv2.MetricStatus{
-					Type: autoscalingv2.ExternalMetricSourceType,
-					External: &autoscalingv2.ExternalMetricStatus{
-						MetricSelector: metricSpec.External.MetricSelector,
-						MetricName:     metricSpec.External.MetricName,
-						CurrentValue:   *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
-					},
-				}
-
-			} else {
-				errMsg := "invalid external metric source: the high watermark and the low watermark are required"
-				r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetExternalMetric", errMsg)
-				setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetExternalMetrics", "the SHPA was unable to compute the replica count: %v", err)
-				return 0, nil, time.Time{}, fmt.Errorf(errMsg)
+			statuses[i] = autoscalingv2.MetricStatus{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricStatus{
+					MetricSelector: metricSpec.External.MetricSelector,
+					MetricName:     metricSpec.External.MetricName,
+					CurrentValue:   *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+				},
 			}
 		case dbishpav1.ResourceMetricSourceType:
-			if metricSpec.Resource.HighWatermark != nil && metricSpec.Resource.LowWatermark != nil {
-				metricNameProposal = fmt.Sprintf("%s{%v}", metricSpec.Resource.Name, metricSpec.Resource.MetricSelector.MatchLabels)
+			replicaCalculation, errMetricsServer := r.replicaCalc.GetResourceReplicas(logger, scale, metricSpec, shpa)
+			if errMetricsServer != nil {
+				return replicaCalculation.ReplicaCount, nil, replicaCalculation.Timestamp, errMetricsServer
+			}
 
-				replicaCalculation, errMetricsServer := r.replicaCalc.GetResourceReplicas(logger, scale, metricSpec, shpa)
-				if errMetricsServer != nil {
-					r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetResourceMetric", errMetricsServer.Error())
-					setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetResourceMetric", "the SHPA was unable to compute the replica count: %v", errMetricsServer)
-					return 0, nil, time.Time{}, fmt.Errorf("failed to get resource metric %s: %v", metricSpec.Resource.Name, errMetricsServer)
-				}
+			replicaCountProposal = replicaCalculation.ReplicaCount
+			timestampProposal = replicaCalculation.Timestamp
+			utilizationProposal = replicaCalculation.Utilization
 
-				replicaCountProposal = replicaCalculation.replicaCount
-				utilizationProposal = replicaCalculation.utilization
-				timestampProposal = replicaCalculation.timestamp
+			replicaCountProposal = replicaCalculation.ReplicaCount
+			utilizationProposal = replicaCalculation.Utilization
+			timestampProposal = replicaCalculation.Timestamp
 
-				statuses[i] = autoscalingv2.MetricStatus{
-					Type: autoscalingv2.ResourceMetricSourceType,
-					Resource: &autoscalingv2.ResourceMetricStatus{
-						Name:                metricSpec.Resource.Name,
-						CurrentAverageValue: *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
-					},
-				}
-			} else {
-				errMsg := "invalid resource metric source: the high watermark and the low watermark are required"
-				r.eventRecorder.Event(shpa, corev1.EventTypeWarning, "FailedGetResourceMetric", errMsg)
-				setCondition(shpa, autoscalingv2.ScalingActive, corev1.ConditionFalse, "FailedGetResourceMetric", "thee SHPA was unable to compute the replica count:%v", err)
-				return 0, nil, time.Time{}, fmt.Errorf(errMsg)
+			statuses[i] = autoscalingv2.MetricStatus{
+				Type: autoscalingv2.ResourceMetricSourceType,
+				Resource: &autoscalingv2.ResourceMetricStatus{
+					Name:                metricSpec.Resource.Name,
+					CurrentAverageValue: *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+				},
 			}
 		default:
 			return 0, nil, time.Time{}, fmt.Errorf("metricSpec.Type:%s not supported", metricSpec.Type)
@@ -654,7 +614,7 @@ func convertDesiredReplicasWithRules(logger logr.Logger, shpa *dbishpav1.SHPA, c
 		minimumAllowedReplicas = int32(math.Max(float64(scaleDownLimit), float64(wpaMinReplicas)))
 		possibleLimitingCondition = "ScaleDownLimit"
 		possibleLimitingReason = "the desired replica count is decreasing faster than the maximum scale rate"
-		logger.Info("Downscaling rate higher than limit of `scaleDownLimitFactor`, capping the maximum downscale to 'minimumAllowedReplicas'", "scaleDownLimitFactor", fmt.Sprintf("%.1f%%", shpa.Spec.ScaleDownLimitFactor), "wpaMinReplicas", wpaMinReplicas, "minimumAllowedReplicas", minimumAllowedReplicas)
+		logger.Info("Downscaling rate higher than limit of `scaleDownLimitFactor`, capping the maximum downscale to 'minimumAllowedReplicas'", "scaleDownLimitFactor", fmt.Sprintf("%d", shpa.Spec.ScaleDownLimitFactor), "wpaMinReplicas", wpaMinReplicas, "minimumAllowedReplicas", minimumAllowedReplicas)
 	case desiredReplicas >= scaleDownLimit:
 		minimumAllowedReplicas = wpaMinReplicas
 		possibleLimitingCondition = "TooFewReplicas"
@@ -669,7 +629,7 @@ func convertDesiredReplicasWithRules(logger logr.Logger, shpa *dbishpav1.SHPA, c
 
 	if desiredReplicas > scaleUpLimit {
 		maximumAllowedReplicas = int32(math.Min(float64(scaleUpLimit), float64(wpaMaxReplicas)))
-		logger.Info("Upscaling rate higher than limit of 'ScaleUpLimitFactor' up to 'maximumAllowedReplicas' replicas. Capping the maximum upscale to %d replicas", "scaleUpLimitFactor", fmt.Sprintf("%.1f%%", shpa.Spec.ScaleUpLimitFactor), "wpaMaxReplicas", wpaMaxReplicas, "maximumAllowedReplicas", maximumAllowedReplicas)
+		logger.Info("Upscaling rate higher than limit of 'ScaleUpLimitFactor' up to 'maximumAllowedReplicas' replicas. Capping the maximum upscale to %d replicas", "scaleUpLimitFactor", fmt.Sprintf("%d", shpa.Spec.ScaleUpLimitFactor), "wpaMaxReplicas", wpaMaxReplicas, "maximumAllowedReplicas", maximumAllowedReplicas)
 		possibleLimitingCondition = "ScaleUpLimit"
 		possibleLimitingReason = "the desired replica count is increasing faster than the maximum scale rate"
 	} else {
@@ -737,14 +697,6 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	existingCond.Message = fmt.Sprintf(message, args...)
 
 	return resList
-}
-
-// Stolen from upstream
-
-func (r *SHPAReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&dbishpav1.SHPA{}).
-		Complete(r)
 }
 
 // Scaleup limit is used to maximize the upscaling rate.
