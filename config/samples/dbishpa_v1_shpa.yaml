@@ -14,8 +14,8 @@ spec:
   metrics:
     - type: Resource
       resource:
-        highWatermark: "80m"
-        lowWatermark: "30m"
+        highWatermark: "90m"
+        lowWatermark: "10m"
         name: cpu
         metricSelector:
           matchLabels:
